@@ -73,15 +73,11 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
           base64: false,
         });
         
-        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
-        
         try {
           const processed = await cameraBackend.processNewClothingItem(photo.uri, {
             captureMethod: 'camera',
             timestamp: new Date().toISOString(),
           });
-          
-          Alert.dismiss();
           
           setProcessedItem(processed);
           setCapturedImage(processed.imageData.localUri);
@@ -95,7 +91,6 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
           
           setShowCategorizeModal(true);
         } catch (error) {
-          Alert.dismiss();
           console.error('Error processing image:', error);
           Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
             {
@@ -110,7 +105,6 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
         }
         
       } catch (error) {
-        Alert.dismiss();
         console.error('Camera error:', error);
         Alert.alert('Camera Error', 'Failed to take picture. Please try again.');
       }
@@ -120,7 +114,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
   const pickImageFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.Images,
         allowsEditing: true,
         aspect: [3, 4],
         quality: 0.7,
@@ -135,8 +129,6 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
             timestamp: new Date().toISOString(),
           });
           
-          Alert.dismiss();
-          
           setProcessedItem(processed);
           setCapturedImage(processed.imageData.localUri);
           
@@ -149,7 +141,6 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
           
           setShowCategorizeModal(true);
         } catch (error) {
-          Alert.dismiss();
           console.error('Error processing image:', error);
           Alert.alert('Processing Error', 'Failed to process the selected image. You can still add it manually.', [
             {

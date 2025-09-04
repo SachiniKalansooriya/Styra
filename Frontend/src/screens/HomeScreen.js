@@ -30,10 +30,7 @@ export default function HomeScreen({ navigation, backendConnected }) {
   // Test API connection
   const testApiConnection = async () => {
     try {
-      Alert.alert('Testing Connection...', 'Checking all backend endpoints...', [], { cancelable: false });
       const result = await connectionService.testAllServices();
-      
-      Alert.dismiss();
       
       if (result.backend.success) {
         Alert.alert(
@@ -54,7 +51,6 @@ export default function HomeScreen({ navigation, backendConnected }) {
         setConnectionStatus(false);
       }
     } catch (error) {
-      Alert.dismiss();
       Alert.alert(
         '⚠️ Connection Test Failed', 
         `Error testing connection: ${error.message}\n\nThe app will work in offline mode.`,
@@ -137,8 +133,6 @@ export default function HomeScreen({ navigation, backendConnected }) {
             timestamp: new Date().toISOString(),
           });
           
-          Alert.dismiss();
-          
           // Navigate to AddClothes screen with processed data
           navigation.navigate('AddClothes', { 
             processedItem,
@@ -147,7 +141,6 @@ export default function HomeScreen({ navigation, backendConnected }) {
           });
           
         } catch (error) {
-          Alert.dismiss();
           console.error('Error processing image:', error);
           Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
             {
@@ -163,7 +156,6 @@ export default function HomeScreen({ navigation, backendConnected }) {
         }
         
       } catch (error) {
-        Alert.dismiss();
         console.error('Camera error:', error);
         Alert.alert('Camera Error', 'Failed to take picture. Please try again.');
       }
@@ -174,7 +166,7 @@ export default function HomeScreen({ navigation, backendConnected }) {
   const pickImageFromGallery = async () => {
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -189,8 +181,6 @@ export default function HomeScreen({ navigation, backendConnected }) {
           timestamp: new Date().toISOString(),
         });
         
-        Alert.dismiss();
-        
         navigation.navigate('AddClothes', { 
           processedItem,
           fromGallery: true,
@@ -198,7 +188,6 @@ export default function HomeScreen({ navigation, backendConnected }) {
         });
         
       } catch (error) {
-        Alert.dismiss();
         console.error('Error processing gallery image:', error);
         Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
           {

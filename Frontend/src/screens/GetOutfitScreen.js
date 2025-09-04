@@ -22,7 +22,7 @@ const GetOutfitScreen = ({ navigation }) => {
   const occasions = [
     { id: 'casual', name: 'Casual', icon: 'shirt' },
     { id: 'work', name: 'Work', icon: 'briefcase' },
-    { id: 'formal', name: 'Formal', icon: 'tuxedo' },
+    { id: 'formal', name: 'Formal', icon: 'business' },
     { id: 'workout', name: 'Workout', icon: 'fitness' },
     { id: 'date', name: 'Date Night', icon: 'heart' },
   ];
