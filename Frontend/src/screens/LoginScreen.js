@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import userService from '../services/userService';
+import connectionService from '../services/connectionService';
 
-export const LoginScreen = ({ navigation }) => {
+export const LoginScreen = ({ navigation, backendConnected }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,13 +28,28 @@ export const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
     
-    // Simulate login process
-    setTimeout(() => {
+    try {
+      if (backendConnected) {
+        // Try to login via API
+        const response = await userService.login({ email, password });
+        Alert.alert('Success', 'Welcome back!', [
+          { text: 'OK', onPress: () => navigation.navigate('Home') }
+        ]);
+      } else {
+        // Fallback to mock login when backend is not available
+        console.log('Backend not available, using mock login');
+        setTimeout(() => {
+          Alert.alert('Success', 'Welcome back! (Offline Mode)', [
+            { text: 'OK', onPress: () => navigation.navigate('Home') }
+          ]);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Login Failed', error.message || 'Please try again');
+    } finally {
       setLoading(false);
-      Alert.alert('Success', 'Welcome back!', [
-        { text: 'OK', onPress: () => navigation.navigate('Home') }
-      ]);
-    }, 1500);
+    }
   };
 
   return (

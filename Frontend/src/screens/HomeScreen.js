@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -10,13 +10,58 @@ import { useTheme } from '../themes/ThemeProvider';
 import { Card } from '../components/common/Card';
 import { ConfidenceBadge } from '../components/common/ConfidenceBadge';
 import { cameraBackend } from '../utils/storage';
+import connectionService from '../services/connectionService';
+import apiService from '../services/apiService';
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, backendConnected }) {
   const { theme, changeThemeByWeather, weatherCondition } = useTheme();
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraType, setCameraType] = useState('back');
+  const [connectionStatus, setConnectionStatus] = useState(backendConnected);
   const cameraRef = useRef();
+
+  // Test backend connection when component mounts
+  useEffect(() => {
+    setConnectionStatus(backendConnected);
+  }, [backendConnected]);
+
+  // Test API connection
+  const testApiConnection = async () => {
+    try {
+      Alert.alert('Testing Connection...', 'Checking all backend endpoints...', [], { cancelable: false });
+      const result = await connectionService.testAllServices();
+      
+      Alert.dismiss();
+      
+      if (result.backend.success) {
+        Alert.alert(
+          '✅ Connection Successful!', 
+          `Backend is working perfectly!\n\n• Health: ${result.health?.data?.status || 'Unknown'}\n• Database: ${result.health?.data?.database || 'Unknown'}\n• Status: Online mode active`,
+          [{ text: 'Great!' }]
+        );
+        setConnectionStatus(true);
+      } else {
+        Alert.alert(
+          '📱 Offline Mode Active', 
+          `Can't reach backend server, but the app works offline!\n\n• Error: ${result.backend.message}\n• Features: Local storage active\n• Mock data: Available\n\n💡 To fix: Make sure backend is running on http://172.20.10.7:8000`,
+          [
+            { text: 'Use Offline', style: 'default' },
+            { text: 'Retry', onPress: testApiConnection }
+          ]
+        );
+        setConnectionStatus(false);
+      }
+    } catch (error) {
+      Alert.dismiss();
+      Alert.alert(
+        '⚠️ Connection Test Failed', 
+        `Error testing connection: ${error.message}\n\nThe app will work in offline mode.`,
+        [{ text: 'OK' }]
+      );
+      setConnectionStatus(false);
+    }
+  };
 
   // Handle camera action
   const handleCameraAction = async () => {
@@ -182,6 +227,14 @@ export default function HomeScreen({ navigation }) {
       description: "Pack smart for travel",
       action: () => navigation.navigate('TripPlanner'),
     },
+    {
+      id: 5,
+      title: "Test Backend",
+      icon: connectionStatus ? "checkmark-circle-outline" : "alert-circle-outline",
+      color: connectionStatus ? "#4CAF50" : "#FF5722",
+      description: connectionStatus ? "Backend connected" : "Test connection",
+      action: () => testApiConnection(),
+    },
   ];
 
   return (
@@ -196,6 +249,16 @@ export default function HomeScreen({ navigation }) {
         <View>
           <Text style={[styles.greeting, { color: theme.text }]}>Good Morning! ☀️</Text>
           <Text style={[styles.title, { color: theme.text }]}>✨ Styra</Text>
+          <View style={styles.connectionStatus}>
+            <Ionicons 
+              name={connectionStatus ? "checkmark-circle" : "close-circle"} 
+              size={12} 
+              color={connectionStatus ? "#4CAF50" : "#FF5722"} 
+            />
+            <Text style={[styles.connectionText, { color: connectionStatus ? "#4CAF50" : "#FF5722" }]}>
+              {connectionStatus ? "Backend Connected" : "Offline Mode"}
+            </Text>
+          </View>
         </View>
         <TouchableOpacity 
           style={[styles.button, { backgroundColor: theme.primary }]}
@@ -459,6 +522,16 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  connectionText: {
+    fontSize: 10,
+    marginLeft: 4,
+    fontWeight: '500',
   },
   greeting: {
     fontSize: 16,

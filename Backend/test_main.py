@@ -1,13 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(
-    title="Styra AI Wardrobe Backend",
-    description="Backend API for AI-powered wardrobe styling app",
-    version="1.0.0"
-)
+app = FastAPI(title="Styra Test API")
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,8 +13,8 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Styra AI Wardrobe API", "status": "running"}
+    return {"message": "Backend is working!", "status": "ok"}
 
 @app.get("/health")
-async def health_check():
+async def health():
     return {"status": "healthy"}
