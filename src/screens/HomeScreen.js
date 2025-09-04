@@ -1,8 +1,10 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useTheme } from '../themes/ThemeProvider';
 import { Card } from '../components/common/Card';
@@ -10,6 +12,70 @@ import { ConfidenceBadge } from '../components/common/ConfidenceBadge';
 
 export default function HomeScreen({ navigation }) {
   const { theme, changeThemeByWeather, weatherCondition } = useTheme();
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [cameraType, setCameraType] = useState('back');
+  const cameraRef = useRef();
+
+  // Handle camera action
+  const handleCameraAction = async () => {
+    if (!permission) {
+      // Camera permissions are still loading
+      return;
+    }
+
+    if (!permission.granted) {
+      const response = await requestPermission();
+      if (!response.granted) {
+        Alert.alert(
+          'Camera Permission Required',
+          'Please allow camera access to take photos of your clothes.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+
+    setShowCameraModal(true);
+  };
+
+  // Take picture with camera
+  const takePicture = async () => {
+    if (cameraRef.current) {
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.8,
+          base64: false,
+          skipProcessing: false,
+        });
+        setShowCameraModal(false);
+        // Navigate to AddClothes screen with the captured image
+        navigation.navigate('AddClothes', { capturedImage: photo });
+      } catch (error) {
+        Alert.alert('Error', 'Failed to take picture. Please try again.');
+      }
+    }
+  };
+
+  // Pick image from gallery
+  const pickImageFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        setShowCameraModal(false);
+        // Navigate to AddClothes screen with the selected image
+        navigation.navigate('AddClothes', { capturedImage: result.assets[0] });
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
 
   const mockOutfits = [
     { 
@@ -49,6 +115,7 @@ export default function HomeScreen({ navigation }) {
       icon: "camera-outline",
       color: theme.primary,
       description: "Photograph new items",
+      action: () => handleCameraAction(),
     },
     {
       id: 2,
@@ -56,6 +123,7 @@ export default function HomeScreen({ navigation }) {
       icon: "shirt-outline",
       color: theme.secondary,
       description: "Browse your collection",
+      action: () => navigation.navigate('MyWardrobe'),
     },
     {
       id: 3,
@@ -63,6 +131,7 @@ export default function HomeScreen({ navigation }) {
       icon: "sparkles-outline",
       color: theme.accent,
       description: "AI recommendations",
+      action: () => navigation.navigate('GetOutfit'),
     },
     {
       id: 4,
@@ -70,6 +139,7 @@ export default function HomeScreen({ navigation }) {
       icon: "airplane-outline",
       color: "#9C27B0",
       description: "Pack smart for travel",
+      action: () => navigation.navigate('TripPlanner'),
     },
   ];
 
@@ -86,8 +156,11 @@ export default function HomeScreen({ navigation }) {
           <Text style={[styles.greeting, { color: theme.text }]}>Good Morning! ☀️</Text>
           <Text style={[styles.title, { color: theme.text }]}>✨ Styra</Text>
         </View>
-        <TouchableOpacity style={styles.profileButton}>
-          <Ionicons name="person-circle-outline" size={32} color={theme.primary} />
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: theme.primary }]}
+          onPress={handleCameraAction}
+        >
+          <Text style={styles.buttonText}>📷 Add Clothes</Text>
         </TouchableOpacity>
       </View>
 
@@ -153,6 +226,7 @@ export default function HomeScreen({ navigation }) {
               <TouchableOpacity
                 key={action.id}
                 style={[styles.actionItem, { borderColor: action.color }]}
+                onPress={action.action}
               >
                 <View style={[styles.actionIcon, { backgroundColor: action.color }]}>
                   <Ionicons name={action.icon} size={24} color="white" />
@@ -255,6 +329,80 @@ export default function HomeScreen({ navigation }) {
         </Card>
 
       </ScrollView>
+
+      {/* Camera Modal */}
+      <Modal
+        visible={showCameraModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <View style={styles.cameraModal}>
+          {!permission ? (
+            <View style={styles.permissionContainer}>
+              <Text style={styles.permissionText}>Requesting camera permission...</Text>
+            </View>
+          ) : !permission.granted ? (
+            <View style={styles.permissionContainer}>
+              <Text style={styles.permissionText}>No camera access</Text>
+              <TouchableOpacity
+                style={[styles.permissionButton, { backgroundColor: theme.primary }]}
+                onPress={requestPermission}
+              >
+                <Text style={styles.permissionButtonText}>Grant Permission</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <CameraView
+                style={styles.camera}
+                facing={cameraType}
+                ref={cameraRef}
+              >
+                <View style={styles.cameraOverlay}>
+                  {/* Close button */}
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setShowCameraModal(false)}
+                  >
+                    <Ionicons name="close" size={30} color="white" />
+                  </TouchableOpacity>
+
+                  {/* Camera controls */}
+                  <View style={styles.cameraControls}>
+                    {/* Gallery button */}
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={pickImageFromGallery}
+                    >
+                      <Ionicons name="images" size={30} color="white" />
+                    </TouchableOpacity>
+
+                    {/* Capture button */}
+                    <TouchableOpacity
+                      style={styles.captureButton}
+                      onPress={takePicture}
+                    >
+                      <View style={styles.captureButtonInner} />
+                    </TouchableOpacity>
+
+                    {/* Flip camera button */}
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={() => {
+                        setCameraType(
+                          cameraType === 'back' ? 'front' : 'back'
+                        );
+                      }}
+                    >
+                      <Ionicons name="camera-reverse" size={30} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </CameraView>
+            </>
+          )}
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -279,6 +427,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
+  },
+  button: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   profileButton: {
     padding: 8,
@@ -489,5 +652,84 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     opacity: 0.8,
+  },
+
+  // Camera Modal Styles
+  cameraModal: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'space-between',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  controlButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureButton: {
+    backgroundColor: 'white',
+    borderRadius: 40,
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  captureButtonInner: {
+    backgroundColor: 'white',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  permissionText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  permissionButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  permissionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

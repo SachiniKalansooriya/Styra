@@ -6,6 +6,10 @@ import { LandingScreen } from '../screens/LandingScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import HomeScreen from '../screens/HomeScreen';
+import { AddClothesScreen } from '../screens/AddClothesScreen';
+import MyWardrobeScreen from '../screens/MyWardrobeScreen';
+import TripPlannerScreen from '../screens/TripPlannerScreen';
+import GetOutfitScreen from '../screens/GetOutfitScreen';
 
 const Stack = createStackNavigator();
 
@@ -38,6 +42,10 @@ export const AppNavigator = () => {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="AddClothes" component={AddClothesScreen} />
+        <Stack.Screen name="MyWardrobe" component={MyWardrobeScreen} />
+        <Stack.Screen name="TripPlanner" component={TripPlannerScreen} />
+        <Stack.Screen name="GetOutfit" component={GetOutfitScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
