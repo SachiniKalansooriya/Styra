@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../themes/ThemeProvider';
 import { Card } from '../components/common/Card';
 import { ConfidenceBadge } from '../components/common/ConfidenceBadge';
+import { cameraBackend } from '../utils/storage';
 
 export default function HomeScreen({ navigation }) {
   const { theme, changeThemeByWeather, weatherCondition } = useTheme();
@@ -48,9 +49,30 @@ export default function HomeScreen({ navigation }) {
           base64: false,
           skipProcessing: false,
         });
+        
         setShowCameraModal(false);
-        // Navigate to AddClothes screen with the captured image
-        navigation.navigate('AddClothes', { capturedImage: photo });
+        
+        // Show processing indicator
+        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+        
+        try {
+          // Process the image using camera backend
+          const processedItem = await cameraBackend.processNewClothingItem(photo.uri, {
+            captureMethod: 'camera',
+            timestamp: new Date().toISOString(),
+          });
+          
+          // Navigate to AddClothes screen with processed data
+          navigation.navigate('AddClothes', { 
+            processedItem,
+            fromCamera: true
+          });
+          
+        } catch (error) {
+          console.error('Error processing image:', error);
+          Alert.alert('Error', 'Failed to process the image. Please try again.');
+        }
+        
       } catch (error) {
         Alert.alert('Error', 'Failed to take picture. Please try again.');
       }
@@ -69,8 +91,27 @@ export default function HomeScreen({ navigation }) {
 
       if (!result.canceled) {
         setShowCameraModal(false);
-        // Navigate to AddClothes screen with the selected image
-        navigation.navigate('AddClothes', { capturedImage: result.assets[0] });
+        
+        // Show processing indicator
+        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+        
+        try {
+          // Process the selected image using camera backend
+          const processedItem = await cameraBackend.processNewClothingItem(result.assets[0].uri, {
+            captureMethod: 'gallery',
+            timestamp: new Date().toISOString(),
+          });
+          
+          // Navigate to AddClothes screen with processed data
+          navigation.navigate('AddClothes', { 
+            processedItem,
+            fromCamera: true
+          });
+          
+        } catch (error) {
+          console.error('Error processing image:', error);
+          Alert.alert('Error', 'Failed to process the selected image. Please try again.');
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image. Please try again.');

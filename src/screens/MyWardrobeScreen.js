@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../themes/ThemeProvider';
-import { storage } from '../utils/storage';
+import { storage, cameraBackend } from '../utils/storage';
 
 const MyWardrobeScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -115,10 +115,15 @@ const MyWardrobeScreen = ({ navigation }) => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const success = await storage.deleteWardrobeItem(itemId);
-            if (success) {
-              await loadWardrobeItems();
-            } else {
+            try {
+              const success = await cameraBackend.deleteClothingItem(itemId);
+              if (success) {
+                await loadWardrobeItems();
+              } else {
+                Alert.alert('Error', 'Failed to delete item');
+              }
+            } catch (error) {
+              console.error('Error deleting item:', error);
               Alert.alert('Error', 'Failed to delete item');
             }
           },
@@ -154,57 +159,63 @@ const MyWardrobeScreen = ({ navigation }) => {
     setFilteredItems(filtered);
   };
 
-  const renderWardrobeItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.itemCard, { backgroundColor: theme.cardBackground || 'rgba(255,255,255,0.9)' }]}
-      onPress={() => {
-        Alert.alert(
-          item.name,
-          `Category: ${item.category}\nColor: ${item.color}\nTimes worn: ${item.timesWorn || 0}`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Mark as Worn', onPress: () => handleMarkAsWorn(item.id) },
-            { text: 'Delete', style: 'destructive', onPress: () => handleDeleteItem(item.id) },
-          ]
-        );
-      }}
-    >
-      <Image 
-        source={{ uri: item.image }} 
-        style={styles.itemImage}
-        defaultSource={require('../../assets/adaptive-icon.png')}
-      />
-      <View style={styles.itemInfo}>
-        <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={[styles.itemCategory, { color: theme.primary }]}>
-          {item.category}
-        </Text>
-        <Text style={[styles.itemStats, { color: theme.textSecondary || '#666' }]}>
-          Worn {item.timesWorn || 0} times
-        </Text>
-        {item.lastWorn && (
-          <Text style={[styles.itemStats, { color: theme.textSecondary || '#666' }]}>
-            Last worn: {item.lastWorn}
+  const renderWardrobeItem = ({ item }) => {
+    // Get the correct image URI
+    const imageUri = item.imageData?.localUri || item.image || item.imageUri || 'https://via.placeholder.com/150';
+    
+    return (
+      <TouchableOpacity
+        style={[styles.itemCard, { backgroundColor: theme.cardBackground || 'rgba(255,255,255,0.9)' }]}
+        onPress={() => {
+          Alert.alert(
+            item.name,
+            `Category: ${item.category}\nColor: ${item.color}\nTimes worn: ${item.timesWorn || 0}`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Mark as Worn', onPress: () => handleMarkAsWorn(item.id) },
+              { text: 'Delete', style: 'destructive', onPress: () => handleDeleteItem(item.id) },
+            ]
+          );
+        }}
+      >
+        <Image 
+          source={{ uri: imageUri }} 
+          style={styles.itemImage}
+          defaultSource={require('../../assets/adaptive-icon.png')}
+          onError={() => console.log('Failed to load image:', imageUri)}
+        />
+        <View style={styles.itemInfo}>
+          <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
+            {item.name}
           </Text>
-        )}
-      </View>
-      
-      {/* Action buttons */}
-      <View style={styles.itemActions}>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: theme.primary }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleMarkAsWorn(item.id);
-          }}
-        >
-          <Ionicons name="checkmark" size={16} color="white" />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+          <Text style={[styles.itemCategory, { color: theme.primary }]}>
+            {item.category}
+          </Text>
+          <Text style={[styles.itemStats, { color: theme.textSecondary || '#666' }]}>
+            Worn {item.timesWorn || 0} times
+          </Text>
+          {item.lastWorn && (
+            <Text style={[styles.itemStats, { color: theme.textSecondary || '#666' }]}>
+              Last worn: {item.lastWorn}
+            </Text>
+          )}
+        </View>
+        
+        {/* Action buttons */}
+        <View style={styles.itemActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: theme.primary }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleMarkAsWorn(item.id);
+            }}
+          >
+            <Ionicons name="checkmark" size={16} color="white" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderCategoryFilter = ({ item }) => (
     <TouchableOpacity

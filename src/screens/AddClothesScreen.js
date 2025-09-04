@@ -10,20 +10,21 @@ import {
   TextInput,
   ScrollView,
 } from 'react-native';
-import { Camera } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../themes/ThemeProvider';
+import { cameraBackend } from '../utils/storage';
 
-export const AddClothesScreen = ({ navigation }) => {
+export const AddClothesScreen = ({ navigation, route }) => {
   const { theme } = useTheme();
-  const [hasPermission, setHasPermission] = useState(null);
-  const [type, setType] = useState(Camera.Constants.Type.back);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [cameraType, setCameraType] = useState('back');
   const [capturedImage, setCapturedImage] = useState(null);
   const [showCategorizeModal, setShowCategorizeModal] = useState(false);
+  const [processedItem, setProcessedItem] = useState(null);
   const [itemDetails, setItemDetails] = useState({
     name: '',
     category: '',
@@ -33,15 +34,34 @@ export const AddClothesScreen = ({ navigation }) => {
   const cameraRef = useRef();
 
   useEffect(() => {
+    // Check if we received processed item data from camera
+    if (route.params?.processedItem) {
+      const processed = route.params.processedItem;
+      setProcessedItem(processed);
+      setCapturedImage(processed.imageData.localUri);
+      
+      // Pre-fill form with AI suggestions
+      setItemDetails({
+        name: '',
+        category: processed.suggestedCategory || '',
+        color: processed.suggestedColor || '',
+        season: 'all',
+      });
+      
+      setShowCategorizeModal(true);
+    }
+  }, [route.params]);
+
+  useEffect(() => {
     getPermissions();
   }, []);
 
   const getPermissions = async () => {
-    const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+    if (!permission) {
+      await requestPermission();
+    }
     const { status: mediaStatus } = await MediaLibrary.requestPermissionsAsync();
     const { status: imagePickerStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    setHasPermission(cameraStatus === 'granted' && mediaStatus === 'granted');
   };
 
   const takePicture = async () => {
@@ -51,8 +71,31 @@ export const AddClothesScreen = ({ navigation }) => {
           quality: 0.7,
           base64: false,
         });
-        setCapturedImage(photo.uri);
-        setShowCategorizeModal(true);
+        
+        // Process the image using camera backend
+        try {
+          const processed = await cameraBackend.processNewClothingItem(photo.uri, {
+            captureMethod: 'camera',
+            timestamp: new Date().toISOString(),
+          });
+          
+          setProcessedItem(processed);
+          setCapturedImage(processed.imageData.localUri);
+          
+          // Pre-fill form with AI suggestions
+          setItemDetails({
+            name: '',
+            category: processed.suggestedCategory || '',
+            color: processed.suggestedColor || '',
+            season: 'all',
+          });
+          
+          setShowCategorizeModal(true);
+        } catch (error) {
+          console.error('Error processing image:', error);
+          Alert.alert('Error', 'Failed to process the image. Please try again.');
+        }
+        
       } catch (error) {
         Alert.alert('Error', 'Failed to take picture');
       }
@@ -69,8 +112,29 @@ export const AddClothesScreen = ({ navigation }) => {
       });
 
       if (!result.canceled) {
-        setCapturedImage(result.assets[0].uri);
-        setShowCategorizeModal(true);
+        // Process the selected image using camera backend
+        try {
+          const processed = await cameraBackend.processNewClothingItem(result.assets[0].uri, {
+            captureMethod: 'gallery',
+            timestamp: new Date().toISOString(),
+          });
+          
+          setProcessedItem(processed);
+          setCapturedImage(processed.imageData.localUri);
+          
+          // Pre-fill form with AI suggestions
+          setItemDetails({
+            name: '',
+            category: processed.suggestedCategory || '',
+            color: processed.suggestedColor || '',
+            season: 'all',
+          });
+          
+          setShowCategorizeModal(true);
+        } catch (error) {
+          console.error('Error processing image:', error);
+          Alert.alert('Error', 'Failed to process the selected image. Please try again.');
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image');
@@ -84,24 +148,18 @@ export const AddClothesScreen = ({ navigation }) => {
     }
 
     try {
-      const newItem = {
-        id: Date.now().toString(),
-        ...itemDetails,
-        imageUri: capturedImage,
-        dateAdded: new Date().toISOString(),
-        timesWorn: 0,
-        lastWorn: null,
+      // Combine processed item data with user input
+      const finalItemData = {
+        ...processedItem,
+        name: itemDetails.name,
+        category: itemDetails.category,
+        color: itemDetails.color || processedItem?.suggestedColor || '',
+        season: itemDetails.season,
+        image: capturedImage, // For compatibility with existing code
       };
 
-      // Get existing wardrobe
-      const existingWardrobe = await AsyncStorage.getItem('wardrobe');
-      const wardrobe = existingWardrobe ? JSON.parse(existingWardrobe) : [];
-      
-      // Add new item
-      wardrobe.push(newItem);
-      
-      // Save back to storage
-      await AsyncStorage.setItem('wardrobe', JSON.stringify(wardrobe));
+      // Save using camera backend
+      const savedItem = await cameraBackend.saveClothingItem(finalItemData);
       
       Alert.alert('Success!', 'Clothing item added to your wardrobe', [
         {
@@ -109,17 +167,19 @@ export const AddClothesScreen = ({ navigation }) => {
           onPress: () => {
             setShowCategorizeModal(false);
             setCapturedImage(null);
+            setProcessedItem(null);
             setItemDetails({ name: '', category: '', color: '', season: 'all' });
           }
         },
         {
           text: 'View Wardrobe',
-          onPress: () => navigation.navigate('Wardrobe')
+          onPress: () => navigation.navigate('MyWardrobe')
         }
       ]);
       
     } catch (error) {
-      Alert.alert('Error', 'Failed to save item');
+      console.error('Error saving item:', error);
+      Alert.alert('Error', 'Failed to save item. Please try again.');
     }
   };
 
@@ -145,7 +205,7 @@ export const AddClothesScreen = ({ navigation }) => {
     { key: 'winter', label: 'Winter' },
   ];
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.container}>
         <Text>Requesting permissions...</Text>
@@ -153,7 +213,7 @@ export const AddClothesScreen = ({ navigation }) => {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <LinearGradient colors={theme.background} style={styles.container}>
         <View style={styles.permissionContainer}>
@@ -165,7 +225,7 @@ export const AddClothesScreen = ({ navigation }) => {
           </Text>
           <TouchableOpacity 
             style={[styles.permissionButton, { backgroundColor: theme.primary }]}
-            onPress={getPermissions}
+            onPress={requestPermission}
           >
             <Text style={styles.permissionButtonText}>Grant Permissions</Text>
           </TouchableOpacity>
@@ -191,9 +251,9 @@ export const AddClothesScreen = ({ navigation }) => {
       </View>
 
       {/* Camera View */}
-      <Camera 
+      <CameraView 
         style={styles.camera} 
-        type={type}
+        facing={cameraType}
         ref={cameraRef}
       >
         <View style={styles.cameraContent}>
@@ -203,11 +263,7 @@ export const AddClothesScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={styles.flipButton}
               onPress={() => {
-                setType(
-                  type === Camera.Constants.Type.back
-                    ? Camera.Constants.Type.front
-                    : Camera.Constants.Type.back
-                );
+                setCameraType(cameraType === 'back' ? 'front' : 'back');
               }}
             >
               <Text style={styles.controlText}>🔄</Text>
@@ -240,7 +296,7 @@ export const AddClothesScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
-      </Camera>
+      </CameraView>
 
       {/* Categorize Modal */}
       <Modal
