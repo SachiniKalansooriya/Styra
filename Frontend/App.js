@@ -22,12 +22,10 @@ export default function App() {
   };
 
   const goBack = () => {
-    // Simple back navigation - you can make this more sophisticated with a navigation stack
     setCurrentScreen('Home');
     setScreenParams({});
   };
 
-  // Test backend connection on app start
   useEffect(() => {
     const testConnection = async () => {
       try {
@@ -35,14 +33,7 @@ export default function App() {
         setBackendConnected(connectionResult.backend.success);
         
         if (!connectionResult.backend.success) {
-          // Show connection warning but don't block the app
           console.warn('Backend not available, using offline mode');
-          // Optionally show a toast or alert to inform the user
-          // Alert.alert(
-          //   'Offline Mode', 
-          //   'Backend server is not available. Some features may be limited.',
-          //   [{ text: 'OK' }]
-          // );
         } else {
           console.log('Backend connected successfully!');
         }
@@ -62,7 +53,8 @@ export default function App() {
         goBack,
         params: screenParams 
       },
-      backendConnected // Pass connection status to all screens
+      backendConnected,
+      route: { params: screenParams } // Add route prop for compatibility
     };
     
     switch (currentScreen) {

@@ -2,18 +2,16 @@ import API_CONFIG from '../config/api';
 
 class ApiService {
   constructor() {
-    // Try multiple URLs for better connectivity
     this.urls = [
       API_CONFIG.primary,
       API_CONFIG.fallback,
       API_CONFIG.localhost,
-    ].filter(Boolean); // Remove undefined URLs
+    ].filter(Boolean);
     
     this.timeout = API_CONFIG.TIMEOUT;
     this.headers = API_CONFIG.HEADERS;
   }
 
-  // Generic request method with multiple URL fallback
   async request(endpoint, options = {}) {
     let lastError;
 
@@ -30,7 +28,6 @@ class ApiService {
 
         console.log(`Trying API request to: ${url}`);
         
-        // Create abort controller for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
           controller.abort();
@@ -48,21 +45,19 @@ class ApiService {
         }
         
         const data = await response.json();
-        console.log(`✅ API success with ${baseUrl}:`, data);
+        console.log(`API success with ${baseUrl}:`, data);
         return data;
       } catch (error) {
-        console.log(`❌ Failed ${baseUrl}:`, error.message);
+        console.log(`Failed ${baseUrl}:`, error.message);
         lastError = error;
-        continue; // Try next URL
+        continue;
       }
     }
     
-    // If all URLs failed, throw the last error
-    console.error('🚫 All API endpoints failed');
+    console.error('All API endpoints failed');
     throw new Error(`All backend connections failed. Last error: ${lastError?.message || 'Unknown'}`);
   }
 
-  // GET request
   async get(endpoint, params = {}) {
     const queryString = new URLSearchParams(params).toString();
     const url = queryString ? `${endpoint}?${queryString}` : endpoint;
@@ -72,7 +67,6 @@ class ApiService {
     });
   }
 
-  // POST request
   async post(endpoint, data = {}) {
     return this.request(endpoint, {
       method: 'POST',
@@ -80,7 +74,6 @@ class ApiService {
     });
   }
 
-  // PUT request
   async put(endpoint, data = {}) {
     return this.request(endpoint, {
       method: 'PUT',
@@ -88,19 +81,16 @@ class ApiService {
     });
   }
 
-  // DELETE request
   async delete(endpoint) {
     return this.request(endpoint, {
       method: 'DELETE',
     });
   }
 
-  // Health check
   async healthCheck() {
     return this.get('/health');
   }
 
-  // Test connection
   async testConnection() {
     try {
       const response = await this.get('/');
@@ -119,6 +109,5 @@ class ApiService {
   }
 }
 
-// Create and export a singleton instance
 const apiService = new ApiService();
 export default apiService;

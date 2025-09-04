@@ -12,9 +12,10 @@ import { ConfidenceBadge } from '../components/common/ConfidenceBadge';
 import { cameraBackend } from '../utils/storage';
 import connectionService from '../services/connectionService';
 import apiService from '../services/apiService';
+import wardrobeService from '../services/wardrobeService';
 
 export default function HomeScreen({ navigation, backendConnected }) {
-  const { theme, changeThemeByWeather, weatherCondition } = useTheme();
+  const { theme } = useTheme();
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraType, setCameraType] = useState('back');
@@ -65,26 +66,55 @@ export default function HomeScreen({ navigation, backendConnected }) {
 
   // Handle camera action
   const handleCameraAction = async () => {
-    if (!permission) {
-      // Camera permissions are still loading
+  Alert.alert(
+    'Add Clothing Item',
+    'Choose how you want to add a new clothing item:',
+    [
+      {
+        text: '📷 Take Photo',
+        onPress: openCamera,
+      },
+      {
+        text: '🖼️ Choose from Gallery',
+        onPress: pickImageFromGallery,
+      },
+      {
+        text: '✏️ Add Manually',
+        onPress: () => navigation.navigate('AddClothes', { 
+          backendConnected: connectionStatus,
+          manualEntry: true
+        }),
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+    ]
+  );
+};
+  // Open camera function
+  const openCamera = async () => {
+  if (!permission) {
+    return;
+  }
+
+  if (!permission.granted) {
+    const response = await requestPermission();
+    if (!response.granted) {
+      Alert.alert(
+        'Camera Permission Required',
+        'Please allow camera access to take photos of your clothes.',
+        [{ text: 'OK' }]
+      );
       return;
     }
+  }
 
-    if (!permission.granted) {
-      const response = await requestPermission();
-      if (!response.granted) {
-        Alert.alert(
-          'Camera Permission Required',
-          'Please allow camera access to take photos of your clothes.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-    }
-
-    setShowCameraModal(true);
-  };
-
+  navigation.navigate('AddClothes', { 
+    backendConnected: connectionStatus,
+    openCamera: true
+  });
+};
   // Take picture with camera
   const takePicture = async () => {
     if (cameraRef.current) {
@@ -107,61 +137,87 @@ export default function HomeScreen({ navigation, backendConnected }) {
             timestamp: new Date().toISOString(),
           });
           
+          Alert.dismiss();
+          
           // Navigate to AddClothes screen with processed data
           navigation.navigate('AddClothes', { 
             processedItem,
-            fromCamera: true
+            fromCamera: true,
+            backendConnected: connectionStatus
           });
           
         } catch (error) {
+          Alert.dismiss();
           console.error('Error processing image:', error);
-          Alert.alert('Error', 'Failed to process the image. Please try again.');
+          Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
+            {
+              text: 'Add Manually',
+              onPress: () => navigation.navigate('AddClothes', { 
+                capturedImage: photo.uri,
+                fromCamera: true,
+                backendConnected: connectionStatus
+              })
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
         }
         
       } catch (error) {
-        Alert.alert('Error', 'Failed to take picture. Please try again.');
+        Alert.dismiss();
+        console.error('Camera error:', error);
+        Alert.alert('Camera Error', 'Failed to take picture. Please try again.');
       }
     }
   };
 
   // Pick image from gallery
   const pickImageFromGallery = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
 
-      if (!result.canceled) {
-        setShowCameraModal(false);
+    if (!result.canceled) {
+      Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+      
+      try {
+        const processedItem = await cameraBackend.processNewClothingItem(result.assets[0].uri, {
+          captureMethod: 'gallery',
+          timestamp: new Date().toISOString(),
+        });
         
-        // Show processing indicator
-        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+        Alert.dismiss();
         
-        try {
-          // Process the selected image using camera backend
-          const processedItem = await cameraBackend.processNewClothingItem(result.assets[0].uri, {
-            captureMethod: 'gallery',
-            timestamp: new Date().toISOString(),
-          });
-          
-          // Navigate to AddClothes screen with processed data
-          navigation.navigate('AddClothes', { 
-            processedItem,
-            fromCamera: true
-          });
-          
-        } catch (error) {
-          console.error('Error processing image:', error);
-          Alert.alert('Error', 'Failed to process the selected image. Please try again.');
-        }
+        navigation.navigate('AddClothes', { 
+          processedItem,
+          fromGallery: true,
+          backendConnected: connectionStatus
+        });
+        
+      } catch (error) {
+        Alert.dismiss();
+        console.error('Error processing gallery image:', error);
+        Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
+          {
+            text: 'Add Manually',
+            onPress: () => navigation.navigate('AddClothes', { 
+              capturedImage: result.assets[0].uri,
+              fromGallery: true,
+              backendConnected: connectionStatus
+            })
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]);
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
-  };
+  } catch (error) {
+    console.error('Gallery picker error:', error);
+    Alert.alert('Gallery Error', 'Failed to access gallery. Please try again.');
+  }
+};
 
   const mockOutfits = [
     { 
@@ -274,54 +330,6 @@ export default function HomeScreen({ navigation, backendConnected }) {
         contentContainerStyle={styles.scrollContent}
       >
         
-        {/* Weather Theme Switcher */}
-        <Card style={styles.themeCard}>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>🌤️ Theme Mood</Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.text }]}>
-              Current: {weatherCondition}
-            </Text>
-          </View>
-          <View style={styles.themeButtons}>
-            {[
-              { key: 'sunny', emoji: '☀️', label: 'Sunny' },
-              { key: 'rainy', emoji: '🌧️', label: 'Rainy' },
-              { key: 'cloudy', emoji: '☁️', label: 'Cloudy' },
-              { key: 'party', emoji: '🎉', label: 'Party' },
-            ].map((weather) => (
-              <TouchableOpacity
-                key={weather.key}
-                style={[
-                  styles.themeButton,
-                  { 
-                    backgroundColor: weatherCondition === weather.key 
-                      ? theme.primary 
-                      : 'rgba(255,255,255,0.3)',
-                    borderColor: weatherCondition === weather.key 
-                      ? theme.primary 
-                      : 'transparent',
-                    borderWidth: 2,
-                  }
-                ]}
-                onPress={() => changeThemeByWeather(weather.key)}
-              >
-                <Text style={styles.themeEmoji}>{weather.emoji}</Text>
-                <Text style={[
-                  styles.themeButtonText,
-                  { 
-                    color: weatherCondition === weather.key 
-                      ? 'white' 
-                      : theme.text,
-                    fontWeight: weatherCondition === weather.key ? 'bold' : '500'
-                  }
-                ]}>
-                  {weather.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Card>
-
         {/* Quick Actions Grid */}
         <Card style={styles.actionsCard}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>⚡ Quick Actions</Text>
@@ -401,7 +409,7 @@ export default function HomeScreen({ navigation, backendConnected }) {
             </View>
             <View style={styles.weatherInfo}>
               <Text style={[styles.weatherTemp, { color: theme.primary }]}>28°C</Text>
-              <Text style={[styles.weatherCondition, { color: theme.text }]}>Sunny</Text>
+              <Text style={[styles.weatherCondition, { color: theme.text }]}>Clear</Text>
             </View>
           </View>
           <Text style={[styles.weatherSuggestion, { color: theme.text }]}>
@@ -569,9 +577,6 @@ const styles = StyleSheet.create({
   },
   
   // Card Styles
-  themeCard: {
-    marginBottom: 16,
-  },
   actionsCard: {
     marginBottom: 16,
   },
@@ -604,29 +609,6 @@ const styles = StyleSheet.create({
   seeAll: {
     fontSize: 14,
     fontWeight: '600',
-  },
-
-  // Theme Buttons
-  themeButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  themeButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    marginHorizontal: 4,
-  },
-  themeEmoji: {
-    fontSize: 20,
-    marginBottom: 4,
-  },
-  themeButtonText: {
-    fontSize: 12,
-    textAlign: 'center',
   },
 
   // Quick Actions

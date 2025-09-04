@@ -1,98 +1,38 @@
 // src/screens/MyWardrobeScreen.js
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
   StyleSheet,
-  FlatList,
-  Image,
+  Text,
+  View,
+  ScrollView,
   TouchableOpacity,
-  TextInput,
+  Image,
   Alert,
   RefreshControl,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../themes/ThemeProvider';
-import { storage, cameraBackend } from '../utils/storage';
+import { storage } from '../utils/storage';
+import wardrobeService from '../services/wardrobeService';
 
-const MyWardrobeScreen = ({ navigation }) => {
+const MyWardrobeScreen = ({ navigation, backendConnected }) => {
   const { theme } = useTheme();
-  const [wardrobeItems, setWardrobeItems] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [refreshing, setRefreshing] = useState(false);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Mock data - replace with actual data from your storage/API
-  const mockWardrobeItems = [
-    {
-      id: '1',
-      name: 'Blue Denim Jacket',
-      category: 'Outerwear',
-      color: 'Blue',
-      season: 'Spring',
-      image: 'https://via.placeholder.com/150',
-      lastWorn: '2025-09-01',
-      timesWorn: 5,
-    },
-    {
-      id: '2',
-      name: 'White Cotton T-Shirt',
-      category: 'Tops',
-      color: 'White',
-      season: 'All',
-      image: 'https://via.placeholder.com/150',
-      lastWorn: '2025-08-30',
-      timesWorn: 12,
-    },
-    {
-      id: '3',
-      name: 'Black Formal Pants',
-      category: 'Bottoms',
-      color: 'Black',
-      season: 'All',
-      image: 'https://via.placeholder.com/150',
-      lastWorn: '2025-08-28',
-      timesWorn: 8,
-    },
-    {
-      id: '4',
-      name: 'Red Summer Dress',
-      category: 'Dresses',
-      color: 'Red',
-      season: 'Summer',
-      image: 'https://via.placeholder.com/150',
-      lastWorn: '2025-08-25',
-      timesWorn: 3,
-    },
-  ];
-
-  const categories = ['All', 'Tops', 'Bottoms', 'Dresses', 'Shoes', 'Accessories', 'Outerwear'];
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadWardrobeItems();
+    loadWardrobe();
   }, []);
 
-  useEffect(() => {
-    filterItems();
-  }, [searchQuery, selectedCategory, wardrobeItems]);
-
-  const loadWardrobeItems = async () => {
+  const loadWardrobe = async () => {
     try {
       setLoading(true);
-      const items = await storage.getWardrobeItems();
-      if (items.length === 0) {
-        // If no items exist, add some mock data for demonstration
-        setWardrobeItems(mockWardrobeItems);
-        await storage.saveWardrobeItems(mockWardrobeItems);
-      } else {
-        setWardrobeItems(items);
-      }
+      const wardrobeItems = await storage.getWardrobeItems();
+      setItems(wardrobeItems);
     } catch (error) {
-      console.error('Error loading wardrobe items:', error);
+      console.error('Error loading wardrobe:', error);
       Alert.alert('Error', 'Failed to load wardrobe items');
     } finally {
       setLoading(false);
@@ -101,14 +41,14 @@ const MyWardrobeScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadWardrobeItems();
+    await loadWardrobe();
     setRefreshing(false);
   };
 
-  const handleDeleteItem = async (itemId) => {
+  const deleteItem = async (itemId) => {
     Alert.alert(
       'Delete Item',
-      'Are you sure you want to delete this item?',
+      'Are you sure you want to delete this clothing item?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -116,176 +56,108 @@ const MyWardrobeScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const success = await cameraBackend.deleteClothingItem(itemId);
-              if (success) {
-                await loadWardrobeItems();
-              } else {
-                Alert.alert('Error', 'Failed to delete item');
-              }
+              await storage.deleteWardrobeItem(itemId);
+              await loadWardrobe(); // Reload the list
+              Alert.alert('Success', 'Item deleted successfully');
             } catch (error) {
-              console.error('Error deleting item:', error);
               Alert.alert('Error', 'Failed to delete item');
             }
-          },
-        },
+          }
+        }
       ]
     );
   };
 
-  const handleMarkAsWorn = async (itemId) => {
-    const success = await storage.markItemAsWorn(itemId);
-    if (success) {
-      await loadWardrobeItems();
-      Alert.alert('Success', 'Item marked as worn!');
-    } else {
-      Alert.alert('Error', 'Failed to update item');
-    }
-  };
-
-  const filterItems = () => {
-    let filtered = wardrobeItems;
-
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter(item => item.category === selectedCategory);
-    }
-
-    if (searchQuery) {
-      filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.color.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    setFilteredItems(filtered);
-  };
-
-  const renderWardrobeItem = ({ item }) => {
-    // Get the correct image URI
-    const imageUri = item.imageData?.localUri || item.image || item.imageUri || 'https://via.placeholder.com/150';
-    
-    return (
-      <TouchableOpacity
-        style={[styles.itemCard, { backgroundColor: theme.cardBackground || 'rgba(255,255,255,0.9)' }]}
-        onPress={() => {
-          Alert.alert(
-            item.name,
-            `Category: ${item.category}\nColor: ${item.color}\nTimes worn: ${item.timesWorn || 0}`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Mark as Worn', onPress: () => handleMarkAsWorn(item.id) },
-              { text: 'Delete', style: 'destructive', onPress: () => handleDeleteItem(item.id) },
-            ]
-          );
-        }}
+  const renderItem = (item) => (
+    <View key={item.id} style={[styles.itemCard, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+      {item.imageData?.localUri && (
+        <Image source={{ uri: item.imageData.localUri }} style={styles.itemImage} />
+      )}
+      <View style={styles.itemDetails}>
+        <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
+        <Text style={[styles.itemCategory, { color: theme.text, opacity: 0.8 }]}>
+          {item.category} • {item.color}
+        </Text>
+        <Text style={[styles.itemSeason, { color: theme.text, opacity: 0.6 }]}>
+          {item.season} • Worn {item.timesWorn || 0} times
+        </Text>
+        {item.pendingSync && (
+          <Text style={[styles.syncStatus, { color: '#FFA500' }]}>
+            ⏳ Pending sync
+          </Text>
+        )}
+      </View>
+      <TouchableOpacity 
+        style={styles.deleteButton}
+        onPress={() => deleteItem(item.id)}
       >
-        <Image 
-          source={{ uri: imageUri }} 
-          style={styles.itemImage}
-          defaultSource={require('../../assets/adaptive-icon.png')}
-          onError={() => console.log('Failed to load image:', imageUri)}
-        />
-        <View style={styles.itemInfo}>
-          <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={[styles.itemCategory, { color: theme.primary }]}>
-            {item.category}
-          </Text>
-          <Text style={[styles.itemStats, { color: theme.textSecondary || '#666' }]}>
-            Worn {item.timesWorn || 0} times
-          </Text>
-          {item.lastWorn && (
-            <Text style={[styles.itemStats, { color: theme.textSecondary || '#666' }]}>
-              Last worn: {item.lastWorn}
-            </Text>
-          )}
-        </View>
-        
-        {/* Action buttons */}
-        <View style={styles.itemActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.primary }]}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleMarkAsWorn(item.id);
-            }}
-          >
-            <Ionicons name="checkmark" size={16} color="white" />
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.deleteText}>×</Text>
       </TouchableOpacity>
-    );
-  };
-
-  const renderCategoryFilter = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.categoryButton,
-        { backgroundColor: selectedCategory === item ? theme.primary : '#f0f0f0' }
-      ]}
-      onPress={() => setSelectedCategory(item)}
-    >
-      <Text style={[
-        styles.categoryButtonText,
-        { color: selectedCategory === item ? '#fff' : '#666' }
-      ]}>
-        {item}
-      </Text>
-    </TouchableOpacity>
+    </View>
   );
 
+  if (loading && items.length === 0) {
+    return (
+      <LinearGradient colors={theme.background} style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: theme.text }]}>Loading your wardrobe...</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
   return (
-    <LinearGradient colors={theme.background} style={[styles.container]}>
+    <LinearGradient colors={theme.background} style={styles.container}>
       <StatusBar style="auto" />
       
-      <View style={[styles.header, { borderBottomColor: theme.border || '#f0f0f0' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={[styles.backText, { color: theme.text }]}>← Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>My Wardrobe</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('AddClothes')}>
-          <Ionicons name="add" size={24} color={theme.primary} />
+        <Text style={[styles.title, { color: theme.text }]}>My Wardrobe</Text>
+        <TouchableOpacity 
+          style={[styles.addButton, { backgroundColor: theme.primary }]}
+          onPress={() => navigation.navigate('AddClothes')}
+        >
+          <Text style={styles.addButtonText}>+</Text>
         </TouchableOpacity>
       </View>
-
-      <View style={[styles.searchContainer, { backgroundColor: theme.cardBackground || 'rgba(255,255,255,0.9)' }]}>
-        <Ionicons name="search" size={20} color={theme.textSecondary || '#666'} style={styles.searchIcon} />
-        <TextInput
-          style={[styles.searchInput, { color: theme.text }]}
-          placeholder="Search items by name or color..."
-          placeholderTextColor={theme.textSecondary || '#666'}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      <FlatList
-        data={categories}
-        renderItem={renderCategoryFilter}
-        keyExtractor={(item) => item}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryList}
-        contentContainerStyle={styles.categoryListContent}
-      />
 
       <View style={styles.statsContainer}>
-        <Text style={[styles.statsText, { color: theme.textSecondary || '#666' }]}>
-          {filteredItems.length} items {selectedCategory !== 'All' ? `in ${selectedCategory}` : 'total'}
+        <Text style={[styles.statsText, { color: theme.text }]}>
+          {items.length} items • {items.filter(i => i.pendingSync).length} pending sync
         </Text>
       </View>
 
-      <FlatList
-        data={filteredItems}
-        renderItem={renderWardrobeItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.itemsList}
-        showsVerticalScrollIndicator={false}
+      <ScrollView 
+        style={styles.content}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-      />
+        showsVerticalScrollIndicator={false}
+      >
+        {items.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>Your wardrobe is empty</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.text, opacity: 0.7 }]}>
+              Start adding clothes to build your digital wardrobe
+            </Text>
+            <TouchableOpacity 
+              style={[styles.addFirstButton, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('AddClothes')}
+            >
+              <Text style={styles.addFirstButtonText}>Add Your First Item</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.itemsContainer}>
+            {items.map(renderItem)}
+          </View>
+        )}
+      </ScrollView>
     </LinearGradient>
   );
 };
@@ -298,113 +170,129 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
     paddingTop: 50,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  headerTitle: {
-    fontSize: 20,
+  backButton: {
+    padding: 5,
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: 20,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    height: 45,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  categoryList: {
-    maxHeight: 50,
-  },
-  categoryListContent: {
-    paddingHorizontal: 20,
-  },
-  categoryButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+  addButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  categoryButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+  addButtonText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   statsContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingBottom: 10,
   },
   statsText: {
     fontSize: 14,
+    opacity: 0.8,
   },
-  itemsList: {
-    paddingHorizontal: 10,
-  },
-  itemCard: {
+  content: {
     flex: 1,
-    borderRadius: 12,
-    margin: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    paddingHorizontal: 20,
   },
-  itemImage: {
-    width: '100%',
-    height: 120,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    backgroundColor: '#f0f0f0',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  itemInfo: {
-    padding: 12,
+  loadingText: {
+    fontSize: 18,
   },
-  itemName: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  addFirstButton: {
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  addFirstButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+  },
+  itemsContainer: {
+    paddingBottom: 20,
+  },
+  itemCard: {
+    flexDirection: 'row',
+    padding: 15,
+    marginBottom: 15,
+    borderRadius: 15,
+    alignItems: 'center',
+  },
+  itemImage: {
+    width: 80,
+    height: 100,
+    borderRadius: 10,
+    marginRight: 15,
+  },
+  itemDetails: {
+    flex: 1,
+  },
+  itemName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
   itemCategory: {
     fontSize: 14,
-    marginBottom: 4,
+    marginBottom: 3,
+    textTransform: 'capitalize',
   },
-  itemStats: {
+  itemSeason: {
     fontSize: 12,
-    marginBottom: 2,
+    textTransform: 'capitalize',
   },
-  itemActions: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
+  syncStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 5,
   },
-  actionButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  deleteButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,0,0,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 4,
+  },
+  deleteText: {
+    color: '#FF0000',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });
 

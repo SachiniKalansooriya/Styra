@@ -17,14 +17,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../themes/ThemeProvider';
 import { cameraBackend } from '../utils/storage';
+import wardrobeService from '../services/wardrobeService';
 
-export const AddClothesScreen = ({ navigation, route }) => {
+const AddClothesScreen = ({ navigation, backendConnected }) => {
   const { theme } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraType, setCameraType] = useState('back');
   const [capturedImage, setCapturedImage] = useState(null);
   const [showCategorizeModal, setShowCategorizeModal] = useState(false);
   const [processedItem, setProcessedItem] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [itemDetails, setItemDetails] = useState({
     name: '',
     category: '',
@@ -34,13 +36,12 @@ export const AddClothesScreen = ({ navigation, route }) => {
   const cameraRef = useRef();
 
   useEffect(() => {
-    // Check if we received processed item data from camera
-    if (route.params?.processedItem) {
-      const processed = route.params.processedItem;
+    // Check if we received processed item data from params
+    if (navigation.params?.processedItem) {
+      const processed = navigation.params.processedItem;
       setProcessedItem(processed);
       setCapturedImage(processed.imageData.localUri);
       
-      // Pre-fill form with AI suggestions
       setItemDetails({
         name: '',
         category: processed.suggestedCategory || '',
@@ -50,7 +51,7 @@ export const AddClothesScreen = ({ navigation, route }) => {
       
       setShowCategorizeModal(true);
     }
-  }, [route.params]);
+  }, [navigation.params]);
 
   useEffect(() => {
     getPermissions();
@@ -72,17 +73,19 @@ export const AddClothesScreen = ({ navigation, route }) => {
           base64: false,
         });
         
-        // Process the image using camera backend
+        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+        
         try {
           const processed = await cameraBackend.processNewClothingItem(photo.uri, {
             captureMethod: 'camera',
             timestamp: new Date().toISOString(),
           });
           
+          Alert.dismiss();
+          
           setProcessedItem(processed);
           setCapturedImage(processed.imageData.localUri);
           
-          // Pre-fill form with AI suggestions
           setItemDetails({
             name: '',
             category: processed.suggestedCategory || '',
@@ -92,12 +95,24 @@ export const AddClothesScreen = ({ navigation, route }) => {
           
           setShowCategorizeModal(true);
         } catch (error) {
+          Alert.dismiss();
           console.error('Error processing image:', error);
-          Alert.alert('Error', 'Failed to process the image. Please try again.');
+          Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
+            {
+              text: 'Add Manually',
+              onPress: () => {
+                setCapturedImage(photo.uri);
+                setShowCategorizeModal(true);
+              }
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
         }
         
       } catch (error) {
-        Alert.alert('Error', 'Failed to take picture');
+        Alert.dismiss();
+        console.error('Camera error:', error);
+        Alert.alert('Camera Error', 'Failed to take picture. Please try again.');
       }
     }
   };
@@ -112,17 +127,19 @@ export const AddClothesScreen = ({ navigation, route }) => {
       });
 
       if (!result.canceled) {
-        // Process the selected image using camera backend
+        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+        
         try {
           const processed = await cameraBackend.processNewClothingItem(result.assets[0].uri, {
             captureMethod: 'gallery',
             timestamp: new Date().toISOString(),
           });
           
+          Alert.dismiss();
+          
           setProcessedItem(processed);
           setCapturedImage(processed.imageData.localUri);
           
-          // Pre-fill form with AI suggestions
           setItemDetails({
             name: '',
             category: processed.suggestedCategory || '',
@@ -132,8 +149,18 @@ export const AddClothesScreen = ({ navigation, route }) => {
           
           setShowCategorizeModal(true);
         } catch (error) {
+          Alert.dismiss();
           console.error('Error processing image:', error);
-          Alert.alert('Error', 'Failed to process the selected image. Please try again.');
+          Alert.alert('Processing Error', 'Failed to process the selected image. You can still add it manually.', [
+            {
+              text: 'Add Manually',
+              onPress: () => {
+                setCapturedImage(result.assets[0].uri);
+                setShowCategorizeModal(true);
+              }
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
         }
       }
     } catch (error) {
@@ -143,44 +170,75 @@ export const AddClothesScreen = ({ navigation, route }) => {
 
   const saveClothingItem = async () => {
     if (!itemDetails.name || !itemDetails.category) {
-      Alert.alert('Error', 'Please fill in name and category');
+      Alert.alert('Missing Information', 'Please fill in at least the item name and category');
       return;
     }
 
+    setSaving(true);
+
     try {
-      // Combine processed item data with user input
       const finalItemData = {
         ...processedItem,
         name: itemDetails.name,
         category: itemDetails.category,
         color: itemDetails.color || processedItem?.suggestedColor || '',
         season: itemDetails.season,
-        image: capturedImage, // For compatibility with existing code
+        image: capturedImage,
+        dateAdded: new Date().toISOString(),
+        pendingSync: !backendConnected,
       };
 
-      // Save using camera backend
-      const savedItem = await cameraBackend.saveClothingItem(finalItemData);
+      const result = await wardrobeService.addWardrobeItem(finalItemData);
       
-      Alert.alert('Success!', 'Clothing item added to your wardrobe', [
-        {
-          text: 'Add Another',
-          onPress: () => {
-            setShowCategorizeModal(false);
-            setCapturedImage(null);
-            setProcessedItem(null);
-            setItemDetails({ name: '', category: '', color: '', season: 'all' });
-          }
-        },
-        {
-          text: 'View Wardrobe',
-          onPress: () => navigation.navigate('MyWardrobe')
-        }
-      ]);
+      if (result.source === 'backend') {
+        Alert.alert(
+          'Success!', 
+          'Clothing item saved to your wardrobe!\n\nSynced with backend\nSaved locally as backup',
+          [
+            {
+              text: 'Add Another',
+              onPress: resetForm
+            },
+            {
+              text: 'View Wardrobe',
+              onPress: () => navigation.navigate('MyWardrobe')
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          result.pendingSync ? 'Saved Locally' : 'Saved!', 
+          result.message,
+          [
+            {
+              text: 'Add Another',
+              onPress: resetForm
+            },
+            {
+              text: 'View Wardrobe',
+              onPress: () => navigation.navigate('MyWardrobe')
+            }
+          ]
+        );
+      }
       
     } catch (error) {
       console.error('Error saving item:', error);
-      Alert.alert('Error', 'Failed to save item. Please try again.');
+      Alert.alert(
+        'Save Failed', 
+        `Failed to save clothing item: ${error.message}\n\nPlease try again or check your connection.`,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const resetForm = () => {
+    setShowCategorizeModal(false);
+    setCapturedImage(null);
+    setProcessedItem(null);
+    setItemDetails({ name: '', category: '', color: '', season: 'all' });
   };
 
   const categories = [
@@ -218,7 +276,7 @@ export const AddClothesScreen = ({ navigation, route }) => {
       <LinearGradient colors={theme.background} style={styles.container}>
         <View style={styles.permissionContainer}>
           <Text style={[styles.permissionText, { color: theme.text }]}>
-            📸 Camera permission needed
+            Camera permission needed
           </Text>
           <Text style={[styles.permissionSubtext, { color: theme.text }]}>
             To add clothes to your wardrobe, we need access to your camera and photo library.
@@ -238,11 +296,10 @@ export const AddClothesScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <StatusBar style="light" />
       
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.navigate('Home')}
+          onPress={() => navigation.goBack()}
         >
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
@@ -250,7 +307,6 @@ export const AddClothesScreen = ({ navigation, route }) => {
         <View style={styles.placeholder} />
       </View>
 
-      {/* Camera View */}
       <CameraView 
         style={styles.camera} 
         facing={cameraType}
@@ -258,7 +314,6 @@ export const AddClothesScreen = ({ navigation, route }) => {
       >
         <View style={styles.cameraContent}>
           
-          {/* Top Controls */}
           <View style={styles.topControls}>
             <TouchableOpacity 
               style={styles.flipButton}
@@ -270,7 +325,6 @@ export const AddClothesScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Bottom Controls */}
           <View style={styles.bottomControls}>
             <TouchableOpacity 
               style={styles.galleryButton}
@@ -289,7 +343,7 @@ export const AddClothesScreen = ({ navigation, route }) => {
             
             <TouchableOpacity 
               style={styles.tipButton}
-              onPress={() => Alert.alert('📸 Tips', 'For best results:\n• Good lighting\n• Plain background\n• Item laid flat\n• Fill the frame')}
+              onPress={() => Alert.alert('Tips', 'For best results:\n• Good lighting\n• Plain background\n• Item laid flat\n• Fill the frame')}
             >
               <Text style={styles.controlText}>💡</Text>
               <Text style={styles.controlLabel}>Tips</Text>
@@ -298,7 +352,6 @@ export const AddClothesScreen = ({ navigation, route }) => {
         </View>
       </CameraView>
 
-      {/* Categorize Modal */}
       <Modal
         visible={showCategorizeModal}
         animationType="slide"
@@ -309,7 +362,7 @@ export const AddClothesScreen = ({ navigation, route }) => {
             
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                ✨ Categorize Your Item
+                Categorize Your Item
               </Text>
               <TouchableOpacity 
                 onPress={() => setShowCategorizeModal(false)}
@@ -319,14 +372,12 @@ export const AddClothesScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Image Preview */}
             {capturedImage && (
               <View style={styles.imagePreviewContainer}>
                 <Image source={{ uri: capturedImage }} style={styles.imagePreview} />
               </View>
             )}
 
-            {/* Item Name */}
             <View style={styles.inputSection}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Item Name</Text>
               <TextInput
@@ -338,7 +389,6 @@ export const AddClothesScreen = ({ navigation, route }) => {
               />
             </View>
 
-            {/* Category Selection */}
             <View style={styles.inputSection}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Category</Text>
               <View style={styles.categoryGrid}>
@@ -370,7 +420,6 @@ export const AddClothesScreen = ({ navigation, route }) => {
               </View>
             </View>
 
-            {/* Color Selection */}
             <View style={styles.inputSection}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Primary Color</Text>
               <View style={styles.colorGrid}>
@@ -402,7 +451,6 @@ export const AddClothesScreen = ({ navigation, route }) => {
               </View>
             </View>
 
-            {/* Season Selection */}
             <View style={styles.inputSection}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Best Season</Text>
               <View style={styles.seasonGrid}>
@@ -430,13 +478,27 @@ export const AddClothesScreen = ({ navigation, route }) => {
               </View>
             </View>
 
-            {/* Save Button */}
             <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: theme.primary }]}
+              style={[
+                styles.saveButton, 
+                { 
+                  backgroundColor: saving ? 'rgba(100,100,100,0.6)' : theme.primary,
+                  opacity: saving ? 0.6 : 1
+                }
+              ]}
               onPress={saveClothingItem}
+              disabled={saving}
             >
-              <Text style={styles.saveButtonText}>💾 Save to Wardrobe</Text>
+              <Text style={styles.saveButtonText}>
+                {saving ? 'Saving...' : 'Save to Wardrobe'}
+              </Text>
             </TouchableOpacity>
+
+            <View style={styles.connectionIndicator}>
+              <Text style={[styles.connectionText, { color: theme.text }]}>
+                {backendConnected ? 'Online Mode' : 'Offline Mode'}
+              </Text>
+            </View>
 
           </ScrollView>
         </LinearGradient>
@@ -539,7 +601,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   
-  // Permission styles
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -570,7 +631,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Modal styles
   modalContainer: {
     flex: 1,
   },
@@ -695,4 +755,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  connectionIndicator: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  connectionText: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
 });
+
+export default AddClothesScreen;
