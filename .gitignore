@@ -49,6 +49,10 @@ web-build/
 uploads/*
 !uploads/.gitkeep
 
+# Static files (images, etc.)
+Backend/static/*
+!Backend/static/.gitkeep
+
 # Logs
 logs/
 *.log

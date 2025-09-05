@@ -46,6 +46,12 @@ export const AppNavigator = () => {
         <Stack.Screen name="MyWardrobe" component={MyWardrobeScreen} />
         <Stack.Screen name="TripPlanner" component={TripPlannerScreen} />
         <Stack.Screen name="GetOutfit" component={GetOutfitScreen} />
+        // In your main navigation stack
+<Stack.Screen 
+  name="TripHistory" 
+  component={TripHistoryScreen}
+  options={{ headerShown: false }}
+/>
       </Stack.Navigator>
     </NavigationContainer>
   );

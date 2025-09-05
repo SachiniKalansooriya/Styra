@@ -9,14 +9,14 @@ class WardrobeService {
       
       if (isOnline) {
         try {
-          const response = await apiService.post('/wardrobe/items', itemData);
-          await storage.addWardrobeItem(itemData);
+          const response = await apiService.post('/api/wardrobe/items', itemData);
+          // Don't save locally when backend is available to prevent duplicates
           
           return {
             success: true,
-            data: response,
+            data: response.item || response, // Handle both response formats
             source: 'backend',
-            message: 'Item saved to backend and locally'
+            message: 'Item saved to backend'
           };
         } catch (backendError) {
           console.log('Backend save failed, using local storage:', backendError.message);
@@ -52,7 +52,9 @@ class WardrobeService {
       
       if (isOnline) {
         try {
-          return await apiService.get('/wardrobe/items', filters);
+          const response = await apiService.get('/api/wardrobe/items', filters);
+          // Extract the items array from the backend response
+          return response.items || [];
         } catch (error) {
           console.log('Backend fetch failed, using local storage');
           return await storage.getWardrobeItems();

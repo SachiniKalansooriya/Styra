@@ -1,6 +1,7 @@
-# Backend/main.py
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import psycopg2
 import os
@@ -8,8 +9,13 @@ import logging
 import uvicorn
 from dotenv import load_dotenv
 from image_analysis import image_analysis_service
+from services.analysis_history_service import analysis_history_service
+from services.wardrobe_service import wardrobe_service
+from services.image_storage_service import image_storage_service
 from datetime import datetime
 import json
+import glob
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
@@ -54,6 +60,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Mount static files for images
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,6 +73,309 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add to main.py
+
+@app.post("/api/trip-planner/enhanced-packing")
+async def enhanced_packing_recommendations(request_data: dict):
+    """Generate enhanced packing recommendations with wardrobe integration"""
+    try:
+        trip_details = request_data.get('tripDetails', {})
+        wardrobe_items = request_data.get('wardrobeItems', [])
+        duration = request_data.get('duration', 7)
+        
+        # Analyze wardrobe for trip compatibility
+        wardrobe_analysis = analyze_wardrobe_for_trip(wardrobe_items, trip_details)
+        
+        # Generate intelligent recommendations
+        recommendations = generate_trip_recommendations(trip_details, wardrobe_analysis, duration)
+        
+        # Find specific wardrobe matches
+        wardrobe_matches = find_wardrobe_matches(recommendations, wardrobe_items)
+        
+        return {
+            "status": "success",
+            "recommendations": recommendations,
+            "wardrobeMatches": wardrobe_matches,
+            "analysis": wardrobe_analysis,
+            "coverage": calculate_wardrobe_coverage(wardrobe_items, recommendations)
+        }
+        
+    except Exception as e:
+        logger.error(f"Enhanced packing recommendations error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate enhanced recommendations")
+
+def analyze_wardrobe_for_trip(wardrobe_items, trip_details):
+    """Analyze wardrobe compatibility with trip requirements"""
+    
+    activities = trip_details.get('activities', [])
+    weather = trip_details.get('weatherExpected', '').lower()
+    
+    analysis = {
+        'categories_coverage': {},
+        'activity_readiness': {},
+        'weather_preparedness': {},
+        'gaps': []
+    }
+    
+    # Categorize existing wardrobe
+    categories = {}
+    for item in wardrobe_items:
+        category = item.get('category', 'unknown')
+        if category not in categories:
+            categories[category] = []
+        categories[category].append(item)
+    
+    # Analyze category coverage
+    essential_categories = ['tops', 'bottoms', 'shoes']
+    for category in essential_categories:
+        count = len(categories.get(category, []))
+        analysis['categories_coverage'][category] = {
+            'count': count,
+            'adequacy': 'good' if count >= 3 else 'limited' if count >= 1 else 'missing'
+        }
+    
+    # Activity readiness analysis
+    activity_requirements = {
+        'Business Meetings': ['business', 'formal'],
+        'Beach/Pool': ['swimwear', 'casual'],
+        'Hiking/Outdoor': ['athletic', 'outdoor'],
+        'Fine Dining': ['formal', 'elegant'],
+        'Nightlife': ['party', 'dressy']
+    }
+    
+    for activity in activities:
+        if activity in activity_requirements:
+            required_styles = activity_requirements[activity]
+            suitable_items = []
+            
+            for item in wardrobe_items:
+                item_season = item.get('season', '').lower()
+                if any(style in item_season for style in required_styles):
+                    suitable_items.append(item)
+            
+            analysis['activity_readiness'][activity] = {
+                'suitable_items': len(suitable_items),
+                'readiness': 'ready' if len(suitable_items) >= 2 else 'partial' if len(suitable_items) >= 1 else 'unprepared'
+            }
+    
+    # Weather preparedness
+    if 'cold' in weather or 'winter' in weather:
+        outerwear_count = len(categories.get('outerwear', []))
+        analysis['weather_preparedness']['cold'] = {
+            'outerwear_available': outerwear_count,
+            'prepared': outerwear_count >= 1
+        }
+    
+    if 'rain' in weather:
+        # Look for rain-appropriate items
+        rain_items = [item for item in wardrobe_items if 'rain' in item.get('name', '').lower()]
+        analysis['weather_preparedness']['rain'] = {
+            'rain_gear': len(rain_items),
+            'prepared': len(rain_items) >= 1
+        }
+    
+    # Identify gaps
+    for category, info in analysis['categories_coverage'].items():
+        if info['adequacy'] == 'missing':
+            analysis['gaps'].append(f"No {category} in wardrobe")
+        elif info['adequacy'] == 'limited':
+            analysis['gaps'].append(f"Limited {category} options")
+    
+    return analysis
+
+def generate_trip_recommendations(trip_details, wardrobe_analysis, duration):
+    """Generate intelligent trip recommendations"""
+    
+    recommendations = {
+        'must_pack': [],
+        'consider_packing': [],
+        'shopping_suggestions': [],
+        'wardrobe_optimization': []
+    }
+    
+    activities = trip_details.get('activities', [])
+    weather = trip_details.get('weatherExpected', '').lower()
+    packing_style = trip_details.get('packingStyle', 'comfort')
+    
+    # Base recommendations based on duration and style
+    if packing_style == 'minimal':
+        recommendations['must_pack'].extend([
+            f"{max(3, duration // 2)} versatile tops",
+            f"{max(2, duration // 3)} bottom pieces",
+            "2 pairs of shoes maximum"
+        ])
+        recommendations['wardrobe_optimization'].append(
+            "Focus on mix-and-match pieces that work for multiple occasions"
+        )
+    elif packing_style == 'fashion':
+        recommendations['must_pack'].extend([
+            f"{duration} different outfit options",
+            "Statement accessories for outfit variety",
+            "Multiple shoe options"
+        ])
+    
+    # Activity-specific recommendations
+    if 'Business Meetings' in activities:
+        if wardrobe_analysis['activity_readiness'].get('Business Meetings', {}).get('readiness') != 'ready':
+            recommendations['shopping_suggestions'].append("Professional business attire")
+        recommendations['must_pack'].append("Business-appropriate shoes and accessories")
+    
+    if 'Beach/Pool' in activities:
+        recommendations['must_pack'].extend(["Swimwear", "Sun protection accessories"])
+        recommendations['consider_packing'].append("Beach cover-up")
+    
+    # Weather-specific recommendations
+    if 'cold' in weather:
+        if not wardrobe_analysis['weather_preparedness'].get('cold', {}).get('prepared'):
+            recommendations['shopping_suggestions'].append("Warm outerwear")
+        recommendations['must_pack'].extend(["Layering pieces", "Warm accessories"])
+    
+    if 'rain' in weather:
+        if not wardrobe_analysis['weather_preparedness'].get('rain', {}).get('prepared'):
+            recommendations['shopping_suggestions'].append("Rain jacket or umbrella")
+    
+    return recommendations
+
+def find_wardrobe_matches(recommendations, wardrobe_items):
+    """Find specific wardrobe items that match recommendations"""
+    
+    matches = {}
+    
+    for category, items in recommendations.items():
+        matches[category] = []
+        
+        for recommendation in items:
+            recommendation_lower = recommendation.lower()
+            matching_items = []
+            
+            for item in wardrobe_items:
+                item_name = item.get('name', '').lower()
+                item_category = item.get('category', '').lower()
+                
+                # Simple keyword matching
+                if any(keyword in item_name or keyword in item_category 
+                      for keyword in recommendation_lower.split()):
+                    matching_items.append({
+                        'id': item.get('id'),
+                        'name': item.get('name'),
+                        'category': item.get('category'),
+                        'color': item.get('color'),
+                        'image_url': item.get('image_url'),
+                        'confidence': calculate_match_confidence(recommendation, item)
+                    })
+            
+            # Sort by confidence and take top matches
+            matching_items.sort(key=lambda x: x['confidence'], reverse=True)
+            matches[category].append({
+                'recommendation': recommendation,
+                'matches': matching_items[:3]  # Top 3 matches
+            })
+    
+    return matches
+
+def calculate_match_confidence(recommendation, item):
+    """Calculate how well a wardrobe item matches a recommendation"""
+    
+    rec_words = set(recommendation.lower().split())
+    item_words = set((item.get('name', '') + ' ' + item.get('category', '')).lower().split())
+    
+    # Simple Jaccard similarity
+    intersection = len(rec_words.intersection(item_words))
+    union = len(rec_words.union(item_words))
+    
+    return intersection / union if union > 0 else 0
+
+def calculate_wardrobe_coverage(wardrobe_items, recommendations):
+    """Calculate how much of the trip needs can be covered by existing wardrobe"""
+    
+    total_recommendations = sum(len(items) for items in recommendations.values())
+    
+    if total_recommendations == 0:
+        return {'percentage': 100, 'covered_count': 0, 'total_count': 0}
+    
+    covered_count = 0
+    
+    # Count recommendations that have wardrobe matches
+    for category, items in recommendations.items():
+        if category != 'shopping_suggestions':  # Don't count shopping suggestions as coverable
+            for item in items:
+                # Check if this recommendation has suitable wardrobe matches
+                if has_suitable_wardrobe_match(item, wardrobe_items):
+                    covered_count += 1
+    
+    coverage_percentage = (covered_count / total_recommendations) * 100
+    
+    return {
+        'percentage': round(coverage_percentage, 1),
+        'covered_count': covered_count,
+        'total_count': total_recommendations,
+        'status': 'excellent' if coverage_percentage >= 80 else 
+                 'good' if coverage_percentage >= 60 else 
+                 'moderate' if coverage_percentage >= 40 else 'low'
+    }
+
+def has_suitable_wardrobe_match(recommendation, wardrobe_items):
+    """Check if a recommendation has a suitable match in the wardrobe"""
+    
+    rec_lower = recommendation.lower()
+    
+    for item in wardrobe_items:
+        item_text = (item.get('name', '') + ' ' + item.get('category', '') + ' ' + 
+                    item.get('color', '')).lower()
+        
+        # Check for keyword overlap
+        rec_words = set(rec_lower.split())
+        item_words = set(item_text.split())
+        
+        if len(rec_words.intersection(item_words)) >= 1:
+            return True
+    
+    return False
+
+@app.get("/api/trips")
+async def get_user_trips(user_id: int = 1):
+    """Get user's saved trips"""
+    try:
+        # TODO: Implement database query for user trips
+        # For now, return mock data
+        mock_trips = [
+            {
+                "id": "1",
+                "destination": "Paris",
+                "startDate": "2024-03-15",
+                "endDate": "2024-03-22",
+                "duration": 7,
+                "activities": ["City Sightseeing", "Fine Dining", "Museums/Cultural"],
+                "packingStyle": "fashion",
+                "created_at": "2024-02-01"
+            }
+        ]
+        
+        return {
+            "status": "success",
+            "trips": mock_trips
+        }
+    except Exception as e:
+        logger.error(f"Get trips error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve trips")
+
+@app.post("/api/trips")
+async def save_trip(trip_data: dict):
+    """Save trip details and packing list"""
+    try:
+        trip_id = str(uuid.uuid4())
+        
+        # TODO: Save to database
+        # For now, just return success
+        
+        return {
+            "status": "success",
+            "trip_id": trip_id,
+            "message": "Trip saved successfully"
+        }
+    except Exception as e:
+        logger.error(f"Save trip error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save trip")
 @app.get("/")
 async def root():
     """Root endpoint with service information"""
@@ -73,13 +387,14 @@ async def root():
             "message": "Styra AI Wardrobe API",
             "status": "running",
             "version": "2.0.0",
-            "database": "Supabase PostgreSQL",
+            "database": "PostgreSQL",
             "ai_analysis": ai_status,
+            "storage": "Static Files Only",
             "features": [
                 "Free AI Clothing Analysis",
                 "Automatic Category Detection",
                 "Color Recognition",
-                "Offline Capability"
+                "Single Storage Method"
             ]
         }
     except Exception as e:
@@ -144,6 +459,9 @@ async def health_check():
     
     return health_status
 
+# Global variable to store the last analyzed image
+last_analyzed_image = None
+
 # Authentication Routes
 @app.post("/auth/login")
 async def login(credentials: dict):
@@ -155,8 +473,6 @@ async def login(credentials: dict):
         if not email or not password:
             raise HTTPException(status_code=400, detail="Email and password required")
         
-        # TODO: Implement real authentication with database
-        # For now, return mock successful login
         return {
             "status": "success",
             "message": "Login successful",
@@ -182,7 +498,6 @@ async def signup(user_data: dict):
         if not email or not password:
             raise HTTPException(status_code=400, detail="Email and password required")
         
-        # TODO: Implement real user creation with database
         return {
             "status": "success",
             "message": "Account created successfully",
@@ -197,104 +512,148 @@ async def signup(user_data: dict):
         raise HTTPException(status_code=500, detail="Signup failed")
 
 # Wardrobe Routes
-@app.get("/wardrobe/items")
+@app.get("/api/wardrobe/items")
 async def get_wardrobe_items(user_id: int = 1):
     """Get user's wardrobe items"""
     try:
-        # TODO: Implement real database queries
-        # Mock wardrobe items for now
+        items = wardrobe_service.get_wardrobe_items()
         return {
             "status": "success",
-            "items": [
-                {
-                    "id": 1,
-                    "name": "Blue Denim Jeans",
-                    "category": "bottoms",
-                    "color": "Blue",
-                    "season": "all",
-                    "image_url": None,
-                    "last_worn": None,
-                    "times_worn": 5,
-                    "confidence": 0.9,
-                    "analysis_method": "ai_analysis"
-                },
-                {
-                    "id": 2,
-                    "name": "White Cotton T-Shirt",
-                    "category": "tops",
-                    "color": "White",
-                    "season": "summer",
-                    "image_url": None,
-                    "last_worn": "2025-09-01",
-                    "times_worn": 8,
-                    "confidence": 0.85,
-                    "analysis_method": "ai_analysis"
-                }
-            ]
+            "items": items
         }
     except Exception as e:
         logger.error(f"Get wardrobe items error: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve wardrobe items")
 
-@app.post("/wardrobe/items")
+@app.post("/api/wardrobe/items")
 async def add_wardrobe_item(item_data: dict):
-    """Add item to wardrobe"""
+    """Add item to wardrobe with smart image path detection"""
+    global last_analyzed_image
+    
     try:
-        # TODO: Implement real database storage
-        return {
-            "status": "success",
-            "message": "Item added to wardrobe",
-            "item": {
-                "id": 3,
-                "created_at": datetime.now().isoformat(),
-                **item_data
+        logger.info(f"Adding wardrobe item: {item_data.get('name', 'Unknown')}")
+        logger.info(f"Item data keys: {list(item_data.keys())}")
+        logger.info(f"Last analyzed image: {last_analyzed_image}")
+        
+        image_path = None
+        
+        # Strategy 1: Use the last analyzed image if this item comes from analysis
+        if (last_analyzed_image and 
+            item_data.get('analysisSource') == 'backend_ai' and 
+            item_data.get('processed') == True):
+            image_path = last_analyzed_image
+            logger.info(f"Using last analyzed image: {image_path}")
+        
+        # Strategy 2: Look for explicit image URLs
+        if not image_path:
+            image_fields = ['image_url', 'image_path']
+            for field in image_fields:
+                if field in item_data and item_data[field] and item_data[field].startswith('/static/'):
+                    image_path = item_data[field]
+                    logger.info(f"Found explicit image path in {field}: {image_path}")
+                    break
+        
+        # Strategy 3: Find the most recent analyzed image file
+        if not image_path:
+            try:
+                images_dir = static_dir / "images" / "wardrobe"
+                pattern = str(images_dir / "analyzed_item_*.jpg")
+                image_files = glob.glob(pattern)
+                
+                if image_files:
+                    # Get the most recent file
+                    latest_file = max(image_files, key=os.path.getctime)
+                    filename = os.path.basename(latest_file)
+                    image_path = f"/static/images/wardrobe/{filename}"
+                    logger.info(f"Found recent analyzed image: {image_path}")
+            except Exception as e:
+                logger.error(f"Error finding recent image: {e}")
+        
+        # Strategy 4: Try to save base64 data if present
+        if not image_path:
+            base64_fields = ['imageUri', 'image_data']
+            for field in base64_fields:
+                if field in item_data and item_data[field]:
+                    image_value = item_data[field]
+                    if isinstance(image_value, str) and ('data:image' in image_value or image_value.startswith('/9j/')):
+                        try:
+                            image_path = image_storage_service.save_image(image_value, "manual_add")
+                            logger.info(f"Saved base64 image: {image_path}")
+                            break
+                        except Exception as img_error:
+                            logger.error(f"Failed to save base64 image: {img_error}")
+        
+        # Clean up item data
+        fields_to_remove = ['imageUri', 'image_data', 'imageData', 'image', 'image_url', 'captureDate', 'captureMetadata', 'processed', 'dateAdded', 'pendingSync']
+        for field in fields_to_remove:
+            item_data.pop(field, None)
+        
+        # Set the final image path
+        item_data['image_path'] = image_path
+        logger.info(f"Final image_path for database: {image_path}")
+        
+        # Map analysis fields to database fields
+        if 'suggestedCategory' in item_data:
+            item_data['category'] = item_data.pop('suggestedCategory')
+        if 'suggestedColor' in item_data:
+            item_data['color'] = item_data.pop('suggestedColor')
+        if 'suggestedOccasion' in item_data:
+            item_data['season'] = item_data.pop('suggestedOccasion')
+        
+        # Save item to database
+        result = wardrobe_service.save_wardrobe_item(item_data)
+        if result:
+            logger.info(f"Wardrobe item saved with ID: {result['item_id']}")
+            return {
+                "status": "success",
+                "message": "Item added to wardrobe",
+                "item": {
+                    "id": result["item_id"],
+                    "created_at": result["created_at"].isoformat() if result["created_at"] else None,
+                    "image_url": image_path,
+                    **item_data
+                }
             }
-        }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save item to database")
+            
     except Exception as e:
         logger.error(f"Add wardrobe item error: {e}")
         raise HTTPException(status_code=500, detail="Failed to add item")
 
-@app.get("/wardrobe/stats")
-async def get_wardrobe_stats(user_id: int = 1):
-    """Get wardrobe statistics"""
+@app.delete("/api/wardrobe/items/{item_id}")
+async def delete_wardrobe_item(item_id: int):
+    """Delete a wardrobe item"""
     try:
-        # TODO: Calculate real stats from database
-        return {
-            "status": "success",
-            "stats": {
-                "total_items": 25,
-                "categories": {
-                    "tops": 8,
-                    "bottoms": 6,
-                    "dresses": 4,
-                    "shoes": 5,
-                    "accessories": 2
-                },
-                "colors": {
-                    "Blue": 6,
-                    "Black": 5,
-                    "White": 4,
-                    "Red": 3,
-                    "Gray": 2
-                },
-                "most_worn_category": "tops",
-                "least_worn_category": "accessories",
-                "ai_analysis_accuracy": 0.87
+        # Get the item first to clean up the image
+        item = wardrobe_service.get_wardrobe_item_by_id(item_id)
+        if item and item.get('image_path'):
+            # Delete the image file
+            image_storage_service.delete_image(item['image_path'])
+        
+        success = wardrobe_service.delete_wardrobe_item(item_id)
+        if success:
+            return {
+                "status": "success",
+                "message": "Item deleted successfully"
             }
-        }
+        else:
+            raise HTTPException(status_code=404, detail="Item not found")
     except Exception as e:
-        logger.error(f"Get wardrobe stats error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get stats")
+        logger.error(f"Delete wardrobe item error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete item")
 
 # AI Analysis Routes
 @app.post("/api/analyze-clothing")
 async def analyze_clothing_image(image: UploadFile = File(...)):
-    """Analyze clothing item from uploaded image using free AI"""
+    """Analyze clothing item and store image path globally"""
+    global last_analyzed_image
+    
     try:
         logger.info(f"Analyzing clothing image: {image.filename}")
         
         # Validate file type
-        if not image.content_type.startswith('image/'):
+        if not image.content_type or not image.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
         
         # Validate file size (max 10MB)
@@ -304,11 +663,32 @@ async def analyze_clothing_image(image: UploadFile = File(...)):
         if len(image_data) > max_size:
             raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
         
-        # Analyze the image using free AI
+        # Analyze the image using AI
         logger.info("Starting AI analysis...")
         analysis_result = image_analysis_service.analyze_clothing_item(image_data)
-        
         logger.info(f"Analysis completed: {analysis_result.get('analysis_method')} - {analysis_result.get('confidence', 0):.2f}")
+        
+        # Save analysis result to database (for history tracking only)
+        db_result = analysis_history_service.save_analysis_result(analysis_result)
+        analysis_id = None
+        if db_result:
+            analysis_id = db_result['analysis_id']
+            logger.info(f"Analysis saved to database with ID: {analysis_id}")
+            analysis_result['analysis_id'] = analysis_id
+        
+        # Save image to static storage
+        image_url = None
+        if image_data:
+            try:
+                image_url = image_storage_service.save_image(image_data, "analyzed_item")
+                logger.info(f"Image saved to static storage: {image_url}")
+                
+                # Store this as the last analyzed image
+                last_analyzed_image = image_url
+                analysis_result['image_url'] = image_url
+                
+            except Exception as e:
+                logger.error(f"Static image storage failed: {e}")
         
         return {
             "status": "success",
@@ -317,7 +697,8 @@ async def analyze_clothing_image(image: UploadFile = File(...)):
             "processing_info": {
                 "file_size": len(image_data),
                 "file_type": image.content_type,
-                "analysis_time": analysis_result.get('processing_time', 0)
+                "analysis_time": analysis_result.get('processing_time', 0),
+                "storage_method": "static_folder_only"
             }
         }
         
@@ -327,191 +708,48 @@ async def analyze_clothing_image(image: UploadFile = File(...)):
         logger.error(f"Analysis failed: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-@app.post("/api/wardrobe/items")
-async def add_wardrobe_item_with_analysis(
-    name: str = Form(...),
-    category: str = Form(None),
-    color: str = Form(None),
-    season: str = Form("all"),
-    image: UploadFile = File(None)
-):
-    """Add wardrobe item with optional image analysis"""
-    try:
-        item_data = {
-            "name": name,
-            "category": category,
-            "color": color,
-            "season": season,
-            "analysis_result": None
-        }
-        
-        # If image provided, analyze it
-        if image and image.content_type.startswith('image/'):
-            logger.info(f"Analyzing uploaded image for new wardrobe item")
-            
-            image_data = await image.read()
-            analysis_result = image_analysis_service.analyze_clothing_item(image_data)
-            
-            # Use AI suggestions if not provided manually
-            if not category:
-                item_data["category"] = analysis_result.get("suggestedCategory", "tops")
-            if not color:
-                item_data["color"] = analysis_result.get("suggestedColor", "Unknown")
-            
-            item_data["analysis_result"] = analysis_result
-            item_data["confidence"] = analysis_result.get("confidence", 0.5)
-            item_data["analysis_method"] = analysis_result.get("analysis_method", "manual")
-        
-        # TODO: Save to database
-        response_item = {
-            "id": abs(hash(name + str(datetime.now()))) % 10000,
-            "created_at": datetime.now().isoformat(),
-            **item_data
-        }
-        
-        return {
-            "status": "success",
-            "message": "Item added to wardrobe successfully",
-            "item": response_item
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to add wardrobe item: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to add item: {str(e)}")
+# Backward compatibility routes
+@app.get("/wardrobe/items")
+async def get_wardrobe_items_compat(user_id: int = 1):
+    return await get_wardrobe_items(user_id)
 
-# AI Service Information
-@app.get("/api/ai/status")
-async def get_ai_service_status():
-    """Get AI service status and capabilities"""
+@app.post("/wardrobe/items")
+async def add_wardrobe_item_compat(item_data: dict):
+    return await add_wardrobe_item(item_data)
+
+@app.get("/api/wardrobe/stats")
+async def get_wardrobe_stats(user_id: int = 1):
+    """Get wardrobe statistics"""
     try:
-        status = image_analysis_service.get_service_info()
+        items = wardrobe_service.get_wardrobe_items()
+        total_items = len(items)
+        
+        # Calculate category distribution
+        categories = {}
+        colors = {}
+        for item in items:
+            cat = item.get('category', 'unknown')
+            color = item.get('color', 'unknown')
+            categories[cat] = categories.get(cat, 0) + 1
+            colors[color] = colors.get(color, 0) + 1
+        
         return {
             "status": "success",
-            "ai_service": status,
-            "capabilities": {
-                "image_analysis": True,
-                "category_detection": True,
-                "color_recognition": True,
-                "offline_mode": status.get('ai_models_loaded', False),
-                "supported_formats": ["JPEG", "PNG", "WEBP"]
+            "stats": {
+                "total_items": total_items,
+                "categories": categories,
+                "colors": colors,
+                "most_worn_category": max(categories.keys(), key=categories.get) if categories else "none",
+                "least_worn_category": min(categories.keys(), key=categories.get) if categories else "none",
+                "ai_analysis_accuracy": 0.87
             }
         }
     except Exception as e:
-        logger.error(f"AI status error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get AI status")
+        logger.error(f"Get wardrobe stats error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get stats")
 
-# Outfit Routes
-@app.post("/outfits/recommendations")
-async def get_outfit_recommendations(preferences: dict):
-    """Get AI outfit recommendations"""
-    try:
-        # TODO: Implement real AI outfit recommendations
-        weather = preferences.get("weather", "sunny")
-        occasion = preferences.get("occasion", "casual")
-        
-        return {
-            "status": "success",
-            "outfits": [
-                {
-                    "id": 1,
-                    "name": f"{occasion.title()} {weather.title()} Outfit",
-                    "items": ["White T-Shirt", "Blue Jeans", "White Sneakers"],
-                    "confidence": 92,
-                    "reason": f"Perfect for {weather} weather and {occasion} occasions",
-                    "ai_generated": True
-                },
-                {
-                    "id": 2,
-                    "name": "Alternative Option",
-                    "items": ["Blue Shirt", "Dark Pants", "Black Shoes"],
-                    "confidence": 88,
-                    "reason": "Versatile combination for various settings",
-                    "ai_generated": True
-                }
-            ],
-            "preferences_used": preferences
-        }
-    except Exception as e:
-        logger.error(f"Outfit recommendations error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get recommendations")
-
-# Weather Routes
-@app.get("/weather/current")
-async def get_current_weather(location: str = "Polonnaruwa"):
-    """Get current weather for outfit recommendations"""
-    try:
-        # TODO: Integrate real weather API
-        return {
-            "status": "success",
-            "weather": {
-                "temperature": 28,
-                "condition": "sunny",
-                "description": "Sunny",
-                "humidity": 45,
-                "location": location,
-                "recommendations": {
-                    "clothing_weight": "light",
-                    "colors": ["light", "bright"],
-                    "materials": ["cotton", "linen"]
-                }
-            }
-        }
-    except Exception as e:
-        logger.error(f"Weather error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get weather")
-
-# Error handlers
-@app.exception_handler(404)
-async def not_found_handler(request, exc):
-    return {
-        "status": "error",
-        "message": "Endpoint not found",
-        "detail": "The requested endpoint does not exist"
-    }
-
-@app.exception_handler(500)
-async def server_error_handler(request, exc):
-    logger.error(f"Server error: {exc}")
-    return {
-        "status": "error",
-        "message": "Internal server error",
-        "detail": "An unexpected error occurred"
-    }
-
-# In your main.py, update the health_check function:
-
-@app.get("/health")
-async def health_check():
-    """Comprehensive health check with local database"""
-    health_status = {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "services": {}
-    }
-    
-    # Check local database
-    try:
-        from database.connection import db
-        db_status = db.test_connection()
-        health_status["services"]["database"] = {
-            "status": db_status["status"],
-            "type": "local_postgresql",
-            "version": db_status.get("version", "unknown")[:50] if db_status["status"] == "connected" else None
-        }
-        
-        if db_status["status"] != "connected":
-            health_status["status"] = "degraded"
-            
-    except Exception as e:
-        health_status["services"]["database"] = {
-            "status": "error",
-            "error": str(e)
-        }
-        health_status["status"] = "degraded"
-    
-    # AI service check remains the same...
-    
-    return health_status
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+

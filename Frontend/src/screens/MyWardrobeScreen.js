@@ -29,10 +29,19 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
   const loadWardrobe = async () => {
     try {
       setLoading(true);
-      const wardrobeItems = await storage.getWardrobeItems();
-      setItems(wardrobeItems);
+      // Use wardrobeService instead of direct storage access
+      const wardrobeItems = await wardrobeService.getWardrobeItems();
+      
+      // Ensure we always have an array
+      if (Array.isArray(wardrobeItems)) {
+        setItems(wardrobeItems);
+      } else {
+        console.warn('Expected array but got:', typeof wardrobeItems, wardrobeItems);
+        setItems([]);
+      }
     } catch (error) {
       console.error('Error loading wardrobe:', error);
+      setItems([]); // Set empty array on error
       Alert.alert('Error', 'Failed to load wardrobe items');
     } finally {
       setLoading(false);
@@ -68,33 +77,69 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
     );
   };
 
-  const renderItem = (item) => (
-    <View key={item.id} style={[styles.itemCard, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-      {item.imageData?.localUri && (
-        <Image source={{ uri: item.imageData.localUri }} style={styles.itemImage} />
-      )}
-      <View style={styles.itemDetails}>
-        <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
-        <Text style={[styles.itemCategory, { color: theme.text, opacity: 0.8 }]}>
-          {item.category} • {item.color}
-        </Text>
-        <Text style={[styles.itemSeason, { color: theme.text, opacity: 0.6 }]}>
-          {item.season} • {item.occasion || 'casual'} • Worn {item.timesWorn || 0} times
-        </Text>
-        {item.pendingSync && (
-          <Text style={[styles.syncStatus, { color: '#FFA500' }]}>
-            ⏳ Pending sync
-          </Text>
+  const renderItem = (item) => {
+    // Get the image URI - prioritize backend image_url, then fall back to local imageData
+    const getImageUri = () => {
+      // Check if we have a backend-provided image URL
+      if (item.image_url && !item.image_url.startsWith('file://')) {
+        // Backend provided image URL - construct full URL
+        const apiUrl = 'http://172.20.10.7:8000'; // Match the primary API URL
+        if (item.image_url.startsWith('http')) {
+          return item.image_url; // Already full URL
+        } else {
+          return `${apiUrl}${item.image_url}`; // Relative URL, add base
+        }
+      } else if (item.imageData?.localUri && !item.imageData.localUri.startsWith('file:///var/mobile')) {
+        // Local image data (for offline items) - but not mobile container paths
+        return item.imageData.localUri;
+      }
+      // Skip file:// URLs from mobile containers as they're not accessible
+      return null;
+    };
+
+    const imageUri = getImageUri();
+
+    return (
+      <View key={item.id} style={[styles.itemCard, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+        {imageUri ? (
+          <Image 
+            source={{ uri: imageUri }} 
+            style={styles.itemImage} 
+            onError={(error) => {
+              console.log('Image load error for:', imageUri, error);
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully:', imageUri);
+            }}
+          />
+        ) : (
+          <View style={[styles.itemImage, styles.placeholderImage]}>
+            <Text style={styles.placeholderText}>📷</Text>
+          </View>
         )}
+        <View style={styles.itemDetails}>
+          <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
+          <Text style={[styles.itemCategory, { color: theme.text, opacity: 0.8 }]}>
+            {item.category} • {item.color}
+          </Text>
+          <Text style={[styles.itemSeason, { color: theme.text, opacity: 0.6 }]}>
+            {item.season} • {item.occasion || 'casual'} • Worn {item.timesWorn || 0} times
+          </Text>
+          {item.pendingSync && (
+            <Text style={[styles.syncStatus, { color: '#FFA500' }]}>
+              ⏳ Pending sync
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={() => deleteItem(item.id)}
+        >
+          <Text style={styles.deleteText}>×</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity 
-        style={styles.deleteButton}
-        onPress={() => deleteItem(item.id)}
-      >
-        <Text style={styles.deleteText}>×</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   if (loading && items.length === 0) {
     return (
@@ -128,7 +173,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
 
       <View style={styles.statsContainer}>
         <Text style={[styles.statsText, { color: theme.text }]}>
-          {items.length} items • {items.filter(i => i.pendingSync).length} pending sync
+          {Array.isArray(items) ? items.length : 0} items • {Array.isArray(items) ? items.filter(i => i.pendingSync).length : 0} pending sync
         </Text>
       </View>
 
@@ -139,7 +184,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {items.length === 0 ? (
+        {!Array.isArray(items) || items.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>Your wardrobe is empty</Text>
             <Text style={[styles.emptySubtitle, { color: theme.text, opacity: 0.7 }]}>
@@ -154,7 +199,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
           </View>
         ) : (
           <View style={styles.itemsContainer}>
-            {items.map(renderItem)}
+            {Array.isArray(items) && items.map(renderItem)}
           </View>
         )}
       </ScrollView>
@@ -258,6 +303,15 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 10,
     marginRight: 15,
+  },
+  placeholderImage: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 30,
+    opacity: 0.5,
   },
   itemDetails: {
     flex: 1,

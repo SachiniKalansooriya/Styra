@@ -1,4 +1,3 @@
-# Backend/database/connection.py
 import psycopg2
 import psycopg2.extras
 import os
@@ -23,7 +22,7 @@ class DatabaseConnection:
             database = os.getenv("DB_NAME", "styra_wardrobe")
             
             self.connection_string = f"postgresql://{user}:{password}@{host}:{port}/{database}"
-            print(f"Constructed DATABASE_URL: {self.connection_string}")
+            logger.info(f"Constructed DATABASE_URL from components")
     
     @contextmanager
     def get_connection(self):
@@ -50,10 +49,17 @@ class DatabaseConnection:
             cursor = conn.cursor()
             cursor.execute(query, params)
             
-            if fetch:
+            # Check if this is an INSERT/UPDATE/DELETE with RETURNING clause
+            is_returning_query = 'RETURNING' in query.upper() and any(keyword in query.upper() for keyword in ['INSERT', 'UPDATE', 'DELETE'])
+            
+            if fetch or is_returning_query:
+                result = None
                 if cursor.description:
-                    return cursor.fetchall()
-                return None
+                    result = cursor.fetchall()
+                # Commit if it's a data modification query with RETURNING
+                if is_returning_query:
+                    conn.commit()
+                return result
             else:
                 conn.commit()
                 return cursor.rowcount
