@@ -12,12 +12,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import apiService from '../services/apiService';
 
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
   const [loading, setLoading] = useState(false);
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [occasion, setOccasion] = useState('casual');
+  const [location, setLocation] = useState(null);
+  const [locationPermission, setLocationPermission] = useState(null);
 
   const occasions = [
     { id: 'casual', name: 'Casual', icon: 'shirt' },
@@ -91,7 +95,11 @@ const GetOutfitScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
-    fetchWeatherInfo();
+    requestLocationPermission();
+    // Set immediate fallback outfit for testing
+    setCurrentOutfit(mockOutfits.casual);
+    setWeatherInfo(mockWeatherData);
+    // Then try to get real outfit
     generateOutfit();
   }, []);
 
@@ -99,26 +107,127 @@ const GetOutfitScreen = ({ navigation }) => {
     generateOutfit();
   }, [occasion]);
 
+  const requestLocationPermission = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(status);
+      
+      if (status === 'granted') {
+        let locationData = await Location.getCurrentPositionAsync({});
+        setLocation({
+          latitude: locationData.coords.latitude,
+          longitude: locationData.coords.longitude,
+        });
+      } else {
+        // Use default location if permission denied
+        setLocation({
+          latitude: 37.7749, // San Francisco default
+          longitude: -122.4194,
+        });
+      }
+    } catch (error) {
+      console.error('Error requesting location permission:', error);
+      // Fallback to default location
+      setLocation({
+        latitude: 37.7749,
+        longitude: -122.4194,
+      });
+    }
+  };
+
   const fetchWeatherInfo = () => {
     // In a real app, you'd fetch from a weather API
     setWeatherInfo(mockWeatherData);
   };
 
-  const generateOutfit = () => {
-    setLoading(true);
+// Update the generateOutfit function in your GetOutfitScreen.js
+
+const generateOutfit = async () => {
+  setLoading(true);
+  
+  try {
+    // Use default location if not available
+    const locationData = location || {
+      latitude: 37.7749,
+      longitude: -122.4194,
+    };
     
-    // Simulate AI processing time
-    setTimeout(() => {
-      const outfit = mockOutfits[occasion] || mockOutfits.casual;
-      setCurrentOutfit(outfit);
-      setLoading(false);
-    }, 1500);
-  };
+    console.log('Starting outfit generation...', { locationData, occasion });
+    
+    // Call your AI recommendation endpoint using apiService
+    const data = await apiService.post('/api/outfit/ai-recommendation', {
+      user_id: 1, // Replace with actual user ID from your auth system
+      location: {
+        latitude: locationData.latitude,
+        longitude: locationData.longitude
+      },
+      occasion: occasion
+    });
+    
+    console.log('API Response:', data); // For debugging
+    
+    if (data.status === 'success' && data.outfit && !data.outfit.error) {
+      console.log('Setting outfit from API:', data.outfit);
+      setCurrentOutfit(data.outfit);
+      setWeatherInfo(data.weather);
+    } else {
+      // Handle case where user has no wardrobe items
+      if (data.outfit?.error) {
+        console.log('API returned error:', data.outfit);
+        Alert.alert(
+          'Wardrobe Empty', 
+          data.outfit.message || 'Please add some clothes to your wardrobe first!',
+          [
+            { text: 'Add Clothes', onPress: () => navigation.navigate('AddClothes') },
+            { text: 'Use Demo Outfit', onPress: () => {
+              setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
+              setWeatherInfo(mockWeatherData);
+            }},
+            { text: 'OK', style: 'cancel' }
+          ]
+        );
+      } else {
+        console.log('No outfit data available, using fallback');
+        setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
+        setWeatherInfo(mockWeatherData);
+      }
+    }
+  } catch (error) {
+    console.error('Outfit generation error:', error);
+    console.log('Using fallback outfit due to error');
+    
+    // Always show fallback instead of alert for now
+    setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
+    setWeatherInfo(mockWeatherData);
+    
+    // Optional: show alert only if you want to notify user
+    // Alert.alert(
+    //   'Connection Error', 
+    //   'Could not connect to AI service. Showing demo outfit.',
+    //   [{ text: 'OK' }]
+    // );
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleLikeOutfit = () => {
-    Alert.alert('Outfit Liked!', 'This outfit has been saved to your favorites.');
-  };
-
+const handleLikeOutfit = async () => {
+  if (!currentOutfit) return;
+  
+  try {
+    await apiService.post('/api/outfit/feedback', {
+      user_id: 1,
+      outfit_id: currentOutfit.id,
+      feedback_type: 'like',
+      weather_data: weatherInfo,
+      occasion: occasion
+    });
+    
+    Alert.alert('Outfit Liked!', 'Thanks for the feedback! Our AI will learn from your preferences.');
+  } catch (error) {
+    console.error('Feedback error:', error);
+  }
+};
   const handleDislikeOutfit = () => {
     generateOutfit(); // Generate a new outfit
   };
@@ -200,9 +309,12 @@ const GetOutfitScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.itemsContainer}>
-            {currentOutfit.items.map((item, index) => (
-              <View key={item.id} style={styles.outfitItem}>
-                <Image source={{ uri: item.image }} style={styles.itemImage} />
+            {currentOutfit.items && currentOutfit.items.map((item, index) => (
+              <View key={item.id || index} style={styles.outfitItem}>
+                <Image 
+                  source={{ uri: item.image_path ? `http://172.20.10.7:8000${item.image_path}` : 'https://via.placeholder.com/150' }} 
+                  style={styles.itemImage} 
+                />
                 <Text style={styles.itemName}>{item.name}</Text>
                 <Text style={styles.itemCategory}>{item.category}</Text>
               </View>
@@ -240,8 +352,17 @@ const GetOutfitScreen = ({ navigation }) => {
             <ActivityIndicator size="large" color="#FF8C42" />
             <Text style={styles.loadingText}>Generating your perfect outfit...</Text>
           </View>
+        ) : currentOutfit ? (
+          renderOutfitItems()
         ) : (
-          currentOutfit && renderOutfitItems()
+          <View style={styles.emptyContainer}>
+            <Ionicons name="shirt-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyTitle}>No Outfit Generated</Text>
+            <Text style={styles.emptyText}>Tap the refresh button to get outfit suggestions</Text>
+            <TouchableOpacity style={styles.generateButton} onPress={generateOutfit}>
+              <Text style={styles.generateButtonText}>Generate Outfit</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
@@ -478,6 +599,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 5,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  generateButton: {
+    backgroundColor: '#FF8C42',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 25,
+  },
+  generateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

@@ -1,623 +1,591 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
+// screens/HomeScreen.js
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  Alert,
+  Image,
+  Dimensions,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-
 import { useTheme } from '../themes/ThemeProvider';
-import { Card } from '../components/common/Card';
-import { ConfidenceBadge } from '../components/common/ConfidenceBadge';
-import { cameraBackend } from '../utils/storage';
-import connectionService from '../services/connectionService';
-import apiService from '../services/apiService';
 import wardrobeService from '../services/wardrobeService';
+import connectionService from '../services/connectionService';
 
-export default function HomeScreen({ navigation, backendConnected }) {
+const { width } = Dimensions.get('window');
+
+const HomeScreen = ({ navigation }) => {
   const { theme } = useTheme();
-  const [showCameraModal, setShowCameraModal] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-  const [cameraType, setCameraType] = useState('back');
-  const [connectionStatus, setConnectionStatus] = useState(backendConnected);
-  const cameraRef = useRef();
+  const [user, setUser] = useState({ name: 'Fashion Lover' });
+  const [wardrobeStats, setWardrobeStats] = useState({
+    totalItems: 0,
+    recentlyAdded: 0,
+    mostWornCategory: 'tops'
+  });
+  const [todayWeather, setTodayWeather] = useState({
+    temperature: 24,
+    condition: 'sunny',
+    description: 'Sunny'
+  });
+  const [backendConnected, setBackendConnected] = useState(false);
 
-  // Test backend connection when component mounts
-  useEffect(() => {
-    setConnectionStatus(backendConnected);
-  }, [backendConnected]);
-
-  // Test API connection
-  const testApiConnection = async () => {
+  const handleGetOutfit = async () => {
     try {
-      const result = await connectionService.testAllServices();
+      console.log('Calling AI outfit recommendation...');
+      console.log('Using URL: http://172.20.10.7:8000/api/outfit/ai-recommendation');
       
-      if (result.backend.success) {
+      const response = await fetch('http://172.20.10.7:8000/api/outfit/ai-recommendation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: 1,
+          occasion: 'casual',
+          location: {
+            latitude: 40.7128,
+            longitude: -74.0060
+          }
+        })
+      });
+      
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Full AI Response:', JSON.stringify(data, null, 2));
+      
+      if (data.outfit && data.outfit.error) {
+        console.log('Outfit Error:', data.outfit.error);
+        console.log('Error Message:', data.outfit.message);
+        
         Alert.alert(
-          '✅ Connection Successful!', 
-          `Backend is working perfectly!\n\n• Health: ${result.health?.data?.status || 'Unknown'}\n• Database: ${result.health?.data?.database || 'Unknown'}\n• Status: Online mode active`,
-          [{ text: 'Great!' }]
-        );
-        setConnectionStatus(true);
-      } else {
-        Alert.alert(
-          '📱 Offline Mode Active', 
-          `Can't reach backend server, but the app works offline!\n\n• Error: ${result.backend.message}\n• Features: Local storage active\n• Mock data: Available\n\n💡 To fix: Make sure backend is running on http://172.20.10.7:8000`,
+          'Wardrobe Setup Needed',
+          data.outfit.message || 'Please add clothes with proper categories (tops, bottoms, shoes)',
           [
-            { text: 'Use Offline', style: 'default' },
-            { text: 'Retry', onPress: testApiConnection }
+            { text: 'Add Sample Items', onPress: () => addSampleWardrobe() },
+            { text: 'Add Manually', onPress: () => navigation.navigate('AddClothes') },
+            { text: 'Try Anyway', onPress: () => navigation.navigate('GetOutfit') }
           ]
         );
-        setConnectionStatus(false);
+        return;
+      }
+      
+      if (data.status === 'success' && data.outfit && data.outfit.items && data.outfit.items.length > 0) {
+        console.log('Found items:', data.outfit.items.length);
+        console.log('Items:', data.outfit.items);
+        
+        navigation.navigate('GetOutfit', { 
+          outfit: data.outfit,
+          weather: data.weather 
+        });
+      } else {
+        Alert.alert(
+          'Wardrobe Ready!',
+          'Add a few more items for better AI recommendations, or try our sample wardrobe.',
+          [
+            { text: 'Add Sample Items', onPress: () => addSampleWardrobe() },
+            { text: 'Add Items', onPress: () => navigation.navigate('AddClothes') },
+            { text: 'Try Manual', onPress: () => navigation.navigate('GetOutfit') }
+          ]
+        );
       }
     } catch (error) {
+      console.error('Detailed error:', error);
       Alert.alert(
-        '⚠️ Connection Test Failed', 
-        `Error testing connection: ${error.message}\n\nThe app will work in offline mode.`,
-        [{ text: 'OK' }]
+        'Connection Error',
+        'Could not connect to AI styling service. Make sure your backend is running on http://172.20.10.7:8000',
+        [
+          { text: 'Check Backend', onPress: () => checkBackendStatus() },
+          { text: 'Try Manual', onPress: () => navigation.navigate('GetOutfit') },
+          { text: 'OK' }
+        ]
       );
-      setConnectionStatus(false);
     }
   };
 
-  // Handle camera action
-  const handleCameraAction = async () => {
-  Alert.alert(
-    'Add Clothing Item',
-    'Choose how you want to add a new clothing item:',
-    [
-      {
-        text: '📷 Take Photo',
-        onPress: openCamera,
-      },
-      {
-        text: '🖼️ Choose from Gallery',
-        onPress: pickImageFromGallery,
-      },
-      {
-        text: '✏️ Add Manually',
-        onPress: () => navigation.navigate('AddClothes', { 
-          backendConnected: connectionStatus,
-          manualEntry: true
-        }),
-      },
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-    ]
-  );
-};
-  // Open camera function
-  const openCamera = async () => {
-  if (!permission) {
-    return;
-  }
-
-  if (!permission.granted) {
-    const response = await requestPermission();
-    if (!response.granted) {
-      Alert.alert(
-        'Camera Permission Required',
-        'Please allow camera access to take photos of your clothes.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-  }
-
-  navigation.navigate('AddClothes', { 
-    backendConnected: connectionStatus,
-    openCamera: true
-  });
-};
-  // Take picture with camera
-  const takePicture = async () => {
-    if (cameraRef.current) {
-      try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
-          base64: false,
-          skipProcessing: false,
-        });
-        
-        setShowCameraModal(false);
-        
-        // Show processing indicator
-        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
-        
-        try {
-          // Process the image using camera backend
-          const processedItem = await cameraBackend.processNewClothingItem(photo.uri, {
-            captureMethod: 'camera',
-            timestamp: new Date().toISOString(),
-          });
-          
-          // Navigate to AddClothes screen with processed data
-          navigation.navigate('AddClothes', { 
-            processedItem,
-            fromCamera: true,
-            backendConnected: connectionStatus
-          });
-          
-        } catch (error) {
-          console.error('Error processing image:', error);
-          Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
-            {
-              text: 'Add Manually',
-              onPress: () => navigation.navigate('AddClothes', { 
-                capturedImage: photo.uri,
-                fromCamera: true,
-                backendConnected: connectionStatus
-              })
-            },
-            { text: 'Cancel', style: 'cancel' }
-          ]);
+  const addSampleWardrobe = async () => {
+    try {
+      console.log('Adding sample wardrobe items...');
+      const response = await fetch('http://172.20.10.7:8000/api/test/add-sample-wardrobe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         }
-        
-      } catch (error) {
-        console.error('Camera error:', error);
-        Alert.alert('Camera Error', 'Failed to take picture. Please try again.');
+      });
+      
+      const result = await response.json();
+      console.log('Sample wardrobe result:', result);
+      
+      if (result.status === 'success') {
+        Alert.alert(
+          'Sample Items Added!',
+          'Sample wardrobe items have been added. Try getting an outfit now!',
+          [
+            { text: 'Get Outfit', onPress: () => handleGetOutfit() },
+            { text: 'View Wardrobe', onPress: () => navigation.navigate('MyWardrobe') }
+          ]
+        );
+        loadWardrobeStats(); // Refresh stats
+      } else {
+        Alert.alert('Error', 'Failed to add sample items: ' + result.message);
       }
+    } catch (error) {
+      console.error('Error adding sample wardrobe:', error);
+      Alert.alert('Error', 'Failed to add sample wardrobe items');
     }
   };
 
-  // Pick image from gallery
-  const pickImageFromGallery = async () => {
-  try {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+  const checkBackendStatus = async () => {
+    try {
+      const response = await fetch('http://172.20.10.7:8000/health');
+      const status = await response.json();
+      console.log('Backend status:', status);
       
-      try {
-        const processedItem = await cameraBackend.processNewClothingItem(result.assets[0].uri, {
-          captureMethod: 'gallery',
-          timestamp: new Date().toISOString(),
-        });
-        
-        navigation.navigate('AddClothes', { 
-          processedItem,
-          fromGallery: true,
-          backendConnected: connectionStatus
-        });
-        
-      } catch (error) {
-        console.error('Error processing gallery image:', error);
-        Alert.alert('Processing Error', 'Failed to process the image. You can still add it manually.', [
-          {
-            text: 'Add Manually',
-            onPress: () => navigation.navigate('AddClothes', { 
-              capturedImage: result.assets[0].uri,
-              fromGallery: true,
-              backendConnected: connectionStatus
-            })
-          },
-          { text: 'Cancel', style: 'cancel' }
-        ]);
-      }
+      Alert.alert(
+        'Backend Status',
+        `Status: ${status.status}\nDatabase: ${status.services?.database?.status || 'unknown'}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert(
+        'Backend Offline',
+        'Backend server is not running. Please start it with: python main.py',
+        [{ text: 'OK' }]
+      );
     }
-  } catch (error) {
-    console.error('Gallery picker error:', error);
-    Alert.alert('Gallery Error', 'Failed to access gallery. Please try again.');
-  }
-};
+  };
 
-  const mockOutfits = [
-    { 
-      id: 1, 
-      name: "Sunny Day Casual", 
-      confidence: 92, 
-      weather: "sunny",
-      description: "Perfect for a bright day out"
-    },
-    { 
-      id: 2, 
-      name: "Rainy Day Cozy", 
-      confidence: 88, 
-      weather: "rainy",
-      description: "Stay warm and stylish"
-    },
-    { 
-      id: 3, 
-      name: "Party Night Glam", 
-      confidence: 95, 
-      weather: "party",
-      description: "Turn heads at any event"
-    },
-    { 
-      id: 4, 
-      name: "Professional Look", 
-      confidence: 90, 
-      weather: "cloudy",
-      description: "Confident and business-ready"
-    },
-  ];
+  useEffect(() => {
+    checkConnection();
+    loadWardrobeStats();
+    loadTodayWeather();
+  }, []);
+
+  const checkConnection = async () => {
+    try {
+      const connected = await connectionService.isBackendAvailable();
+      setBackendConnected(connected);
+    } catch (error) {
+      setBackendConnected(false);
+    }
+  };
+
+  const loadWardrobeStats = async () => {
+    try {
+      const items = await wardrobeService.getWardrobeItems();
+      
+      if (Array.isArray(items)) {
+        const categories = {};
+        items.forEach(item => {
+          const category = item.category || 'unknown';
+          categories[category] = (categories[category] || 0) + 1;
+        });
+
+        const mostWorn = Object.keys(categories).reduce((a, b) => 
+          categories[a] > categories[b] ? a : b, 'tops'
+        );
+
+        setWardrobeStats({
+          totalItems: items.length,
+          recentlyAdded: items.filter(item => {
+            const addedDate = new Date(item.created_at || item.addedDate);
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return addedDate > weekAgo;
+          }).length,
+          mostWornCategory: mostWorn
+        });
+      }
+    } catch (error) {
+      console.error('Error loading wardrobe stats:', error);
+    }
+  };
+
+  const loadTodayWeather = () => {
+    const conditions = [
+      { temp: 24, condition: 'sunny', desc: 'Sunny' },
+      { temp: 18, condition: 'cloudy', desc: 'Cloudy' },
+      { temp: 15, condition: 'rainy', desc: 'Light Rain' }
+    ];
+    
+    const today = conditions[0];
+    setTodayWeather({
+      temperature: today.temp,
+      condition: today.condition,
+      description: today.desc
+    });
+  };
+
+  const getWeatherIcon = (condition) => {
+    switch (condition) {
+      case 'sunny': return 'sunny';
+      case 'cloudy': return 'cloudy';
+      case 'rainy': return 'rainy';
+      default: return 'partly-sunny';
+    }
+  };
+
+  const getWeatherOutfitSuggestion = () => {
+    if (todayWeather.temperature > 25) {
+      return 'Light, breathable fabrics recommended';
+    } else if (todayWeather.temperature < 15) {
+      return 'Layer up with warm pieces';
+    } else {
+      return 'Perfect weather for versatile styling';
+    }
+  };
 
   const quickActions = [
     {
-      id: 1,
-      title: "Add Clothes",
-      icon: "camera-outline",
-      color: theme.primary,
-      description: "Photograph new items",
-      action: () => handleCameraAction(),
+      id: 'camera',
+      title: 'Add Clothes',
+      subtitle: 'Photo & AI analysis',
+      icon: 'camera',
+      color: '#FF6B6B',
+      onPress: () => navigation.navigate('AddClothes')
     },
     {
-      id: 2,
-      title: "My Wardrobe",
-      icon: "shirt-outline",
-      color: theme.secondary,
-      description: "Browse your collection",
-      action: () => navigation.navigate('MyWardrobe'),
+      id: 'outfit',
+      title: 'Get Outfit',
+      subtitle: 'AI styling assistant',
+      icon: 'shirt',
+      color: '#4ECDC4',
+      onPress: () => handleGetOutfit()
     },
     {
-      id: 3,
-      title: "Get Outfit",
-      icon: "sparkles-outline",
-      color: theme.accent,
-      description: "AI recommendations",
-      action: () => navigation.navigate('GetOutfit'),
+      id: 'wardrobe',
+      title: 'My Wardrobe',
+      subtitle: `${wardrobeStats.totalItems} items`,
+      icon: 'library',
+      color: '#45B7D1',
+      onPress: () => navigation.navigate('MyWardrobe')
     },
     {
-      id: 4,
-      title: "Trip Planner",
-      icon: "airplane-outline",
-      color: "#9C27B0",
-      description: "Pack smart for travel",
-      action: () => navigation.navigate('TripPlanner'),
-    },
-    {
-      id: 5,
-      title: "Test Backend",
-      icon: connectionStatus ? "checkmark-circle-outline" : "alert-circle-outline",
-      color: connectionStatus ? "#4CAF50" : "#FF5722",
-      description: connectionStatus ? "Backend connected" : "Test connection",
-      action: () => testApiConnection(),
-    },
+      id: 'trip',
+      title: 'Trip Planner',
+      subtitle: 'Smart packing lists',
+      icon: 'bag',
+      color: '#FF8C42',
+      onPress: () => navigation.navigate('TripPlanner')
+    }
   ];
 
-  return (
-    <LinearGradient 
-      colors={theme.background} 
-      style={styles.container}
+  const renderQuickAction = (action) => (
+    <TouchableOpacity
+      key={action.id}
+      style={[styles.quickActionCard, { backgroundColor: action.color + '15' }]}
+      onPress={action.onPress}
     >
-      <StatusBar style="auto" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.greeting, { color: theme.text }]}>Good Morning! ☀️</Text>
-          <Text style={[styles.title, { color: theme.text }]}>✨ Styra</Text>
-          <View style={styles.connectionStatus}>
-            <Ionicons 
-              name={connectionStatus ? "checkmark-circle" : "close-circle"} 
-              size={12} 
-              color={connectionStatus ? "#4CAF50" : "#FF5722"} 
-            />
-            <Text style={[styles.connectionText, { color: connectionStatus ? "#4CAF50" : "#FF5722" }]}>
-              {connectionStatus ? "Backend Connected" : "Offline Mode"}
-            </Text>
-          </View>
-        </View>
-        <TouchableOpacity 
-          style={[styles.button, { backgroundColor: theme.primary }]}
-          onPress={handleCameraAction}
-        >
-          <Text style={styles.buttonText}>📷 Add Clothes</Text>
-        </TouchableOpacity>
+      <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}>
+        <Ionicons name={action.icon} size={24} color="#fff" />
       </View>
+      <Text style={styles.quickActionTitle}>{action.title}</Text>
+      <Text style={styles.quickActionSubtitle}>{action.subtitle}</Text>
+    </TouchableOpacity>
+  );
 
-      <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        
-        {/* Quick Actions Grid */}
-        <Card style={styles.actionsCard}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>⚡ Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            {quickActions.map((action) => (
-              <TouchableOpacity
-                key={action.id}
-                style={[styles.actionItem, { borderColor: action.color }]}
-                onPress={action.action}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: action.color }]}>
-                  <Ionicons name={action.icon} size={24} color="white" />
-                </View>
-                <Text style={[styles.actionTitle, { color: theme.text }]}>
-                  {action.title}
-                </Text>
-                <Text style={[styles.actionDescription, { color: theme.text }]}>
-                  {action.description}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Card>
-
-        {/* Today's Outfit Suggestions */}
-        <Card style={styles.outfitsCard}>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>✨ Today's Picks</Text>
-            <TouchableOpacity>
-              <Text style={[styles.seeAll, { color: theme.primary }]}>See All</Text>
-            </TouchableOpacity>
+  return (
+    <LinearGradient colors={theme.background} style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.greeting, { color: theme.text }]}>
+              Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}
+            </Text>
+            <Text style={[styles.userName, { color: theme.text }]}>{user.name}</Text>
           </View>
           
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.outfitsList}
-            contentContainerStyle={styles.outfitsListContent}
-          >
-            {mockOutfits.map((outfit) => (
-              <View key={outfit.id} style={styles.outfitCard}>
-                <View style={styles.outfitImagePlaceholder}>
-                  <Ionicons name="shirt-outline" size={40} color={theme.primary} />
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.connectionStatus}
+              onPress={checkConnection}
+            >
+              <View style={[
+                styles.connectionDot, 
+                { backgroundColor: backendConnected ? '#4CAF50' : '#FF5722' }
+              ]} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => Alert.alert('Notifications', 'No new notifications')}
+            >
+              <Ionicons name="notifications-outline" size={24} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView 
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Weather Card */}
+          <View style={styles.weatherCard}>
+            <LinearGradient
+              colors={['#FF8C42', '#FF6B6B']}
+              style={styles.weatherGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.weatherContent}>
+                <View style={styles.weatherLeft}>
+                  <Text style={styles.weatherTemp}>{todayWeather.temperature}°C</Text>
+                  <Text style={styles.weatherDesc}>{todayWeather.description}</Text>
+                  <Text style={styles.weatherSuggestion}>{getWeatherOutfitSuggestion()}</Text>
                 </View>
-                
-                <View style={styles.outfitInfo}>
-                  <View style={styles.outfitHeader}>
-                    <Text style={[styles.outfitName, { color: theme.text }]} numberOfLines={1}>
-                      {outfit.name}
-                    </Text>
-                  </View>
-                  
-                  <Text style={[styles.outfitDescription, { color: theme.text }]} numberOfLines={2}>
-                    {outfit.description}
-                  </Text>
-                  
-                  <View style={styles.outfitFooter}>
-                    <ConfidenceBadge confidence={outfit.confidence} />
-                    <TouchableOpacity style={styles.heartButton}>
-                      <Ionicons name="heart-outline" size={20} color={theme.primary} />
-                    </TouchableOpacity>
-                  </View>
+                <View style={styles.weatherRight}>
+                  <Ionicons 
+                    name={getWeatherIcon(todayWeather.condition)} 
+                    size={60} 
+                    color="#fff" 
+                  />
                 </View>
               </View>
-            ))}
-          </ScrollView>
-        </Card>
+            </LinearGradient>
+          </View>
 
-        {/* Weather Info Card */}
-        <Card style={styles.weatherCard}>
-          <View style={styles.weatherHeader}>
-            <View>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>🌡️ Today's Weather</Text>
-              <Text style={[styles.weatherLocation, { color: theme.text }]}>
-                Negombo, Western Province
-              </Text>
-            </View>
-            <View style={styles.weatherInfo}>
-              <Text style={[styles.weatherTemp, { color: theme.primary }]}>28°C</Text>
-              <Text style={[styles.weatherCondition, { color: theme.text }]}>Clear</Text>
+          {/* Quick Actions Grid */}
+          <View style={styles.quickActionsContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
+            <View style={styles.quickActionsGrid}>
+              {quickActions.map(renderQuickAction)}
             </View>
           </View>
-          <Text style={[styles.weatherSuggestion, { color: theme.text }]}>
-            Perfect weather for light, breathable fabrics! ✨
-          </Text>
-        </Card>
 
-        {/* Statistics Card */}
-        <Card style={styles.statsCard}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>📊 Your Style Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: theme.primary }]}>47</Text>
-              <Text style={[styles.statLabel, { color: theme.text }]}>Items</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: theme.primary }]}>23</Text>
-              <Text style={[styles.statLabel, { color: theme.text }]}>Outfits</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: theme.primary }]}>12</Text>
-              <Text style={[styles.statLabel, { color: theme.text }]}>Favorites</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: theme.primary }]}>89%</Text>
-              <Text style={[styles.statLabel, { color: theme.text }]}>Match Rate</Text>
+          {/* Wardrobe Insights */}
+          <View style={styles.insightsContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Wardrobe Insights</Text>
+            
+            <View style={styles.insightsGrid}>
+              <View style={[styles.insightCard, styles.insightCardLarge]}>
+                <View style={styles.insightHeader}>
+                  <Ionicons name="analytics" size={24} color="#FF8C42" />
+                  <Text style={styles.insightTitle}>Total Items</Text>
+                </View>
+                <Text style={styles.insightValue}>{wardrobeStats.totalItems}</Text>
+                <Text style={styles.insightSubtext}>
+                  {wardrobeStats.recentlyAdded} added this week
+                </Text>
+              </View>
+
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <Ionicons name="trending-up" size={20} color="#4ECDC4" />
+                  <Text style={styles.insightTitleSmall}>Most Worn</Text>
+                </View>
+                <Text style={styles.insightValueSmall}>{wardrobeStats.mostWornCategory}</Text>
+              </View>
+
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <Ionicons name="time" size={20} color="#45B7D1" />
+                  <Text style={styles.insightTitleSmall}>Last Added</Text>
+                </View>
+                <Text style={styles.insightValueSmall}>
+                  {wardrobeStats.recentlyAdded > 0 ? 'This week' : 'None recent'}
+                </Text>
+              </View>
             </View>
           </View>
-        </Card>
 
-      </ScrollView>
-
-      {/* Camera Modal */}
-      <Modal
-        visible={showCameraModal}
-        animationType="slide"
-        presentationStyle="fullScreen"
-      >
-        <View style={styles.cameraModal}>
-          {!permission ? (
-            <View style={styles.permissionContainer}>
-              <Text style={styles.permissionText}>Requesting camera permission...</Text>
-            </View>
-          ) : !permission.granted ? (
-            <View style={styles.permissionContainer}>
-              <Text style={styles.permissionText}>No camera access</Text>
-              <TouchableOpacity
-                style={[styles.permissionButton, { backgroundColor: theme.primary }]}
-                onPress={requestPermission}
+          {/* Featured Cards */}
+          <View style={styles.featuredContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Discover</Text>
+            
+            {/* Trip Planner Feature Card */}
+            <TouchableOpacity 
+              style={styles.featureCard}
+              onPress={() => navigation.navigate('TripPlanner')}
+            >
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                style={styles.featureGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.permissionButtonText}>Grant Permission</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <CameraView
-                style={styles.camera}
-                facing={cameraType}
-                ref={cameraRef}
-              >
-                <View style={styles.cameraOverlay}>
-                  {/* Close button */}
-                  <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={() => setShowCameraModal(false)}
-                  >
-                    <Ionicons name="close" size={30} color="white" />
-                  </TouchableOpacity>
-
-                  {/* Camera controls */}
-                  <View style={styles.cameraControls}>
-                    {/* Gallery button */}
-                    <TouchableOpacity
-                      style={styles.controlButton}
-                      onPress={pickImageFromGallery}
-                    >
-                      <Ionicons name="images" size={30} color="white" />
-                    </TouchableOpacity>
-
-                    {/* Capture button */}
-                    <TouchableOpacity
-                      style={styles.captureButton}
-                      onPress={takePicture}
-                    >
-                      <View style={styles.captureButtonInner} />
-                    </TouchableOpacity>
-
-                    {/* Flip camera button */}
-                    <TouchableOpacity
-                      style={styles.controlButton}
-                      onPress={() => {
-                        setCameraType(
-                          cameraType === 'back' ? 'front' : 'back'
-                        );
-                      }}
-                    >
-                      <Ionicons name="camera-reverse" size={30} color="white" />
-                    </TouchableOpacity>
+                <View style={styles.featureContent}>
+                  <View style={styles.featureLeft}>
+                    <Text style={styles.featureTitle}>Plan Your Trip</Text>
+                    <Text style={styles.featureSubtitle}>
+                      Smart packing lists based on your wardrobe
+                    </Text>
+                    <View style={styles.featureButton}>
+                      <Text style={styles.featureButtonText}>Start Planning</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#fff" />
+                    </View>
+                  </View>
+                  <View style={styles.featureRight}>
+                    <Ionicons name="airplane" size={50} color="#fff" />
                   </View>
                 </View>
-              </CameraView>
-            </>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* AI Styling Feature Card */}
+            <TouchableOpacity 
+              style={styles.featureCard}
+              onPress={() => handleGetOutfit()}
+            >
+              <LinearGradient
+                colors={['#ffecd2', '#fcb69f']}
+                style={styles.featureGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.featureContent}>
+                  <View style={styles.featureLeft}>
+                    <Text style={[styles.featureTitle, { color: '#8B4513' }]}>AI Stylist</Text>
+                    <Text style={[styles.featureSubtitle, { color: '#8B4513' }]}>
+                      Get personalized outfit recommendations
+                    </Text>
+                    <View style={[styles.featureButton, { backgroundColor: '#8B4513' }]}>
+                      <Text style={styles.featureButtonText}>Try Now</Text>
+                      <Ionicons name="sparkles" size={16} color="#fff" />
+                    </View>
+                  </View>
+                  <View style={styles.featureRight}>
+                    <Ionicons name="color-wand" size={50} color="#8B4513" />
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* Debug Panel */}
+          {__DEV__ && (
+            <View style={styles.debugContainer}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Debug Panel</Text>
+              <View style={styles.debugButtons}>
+                <TouchableOpacity 
+                  style={styles.debugButton}
+                  onPress={() => checkBackendStatus()}
+                >
+                  <Text style={styles.debugButtonText}>Check Backend</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.debugButton}
+                  onPress={() => addSampleWardrobe()}
+                >
+                  <Text style={styles.debugButtonText}>Add Sample Items</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
-        </View>
-      </Modal>
+
+          <View style={styles.bottomSpacing} />
+        </ScrollView>
+      </SafeAreaView>
     </LinearGradient>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  safeArea: {
     flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 50,
     paddingHorizontal: 20,
+    paddingTop: 10,
     paddingBottom: 20,
-  },
-  connectionStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  connectionText: {
-    fontSize: 10,
-    marginLeft: 4,
-    fontWeight: '500',
   },
   greeting: {
     fontSize: 16,
     opacity: 0.8,
-    marginBottom: 4,
   },
-  title: {
-    fontSize: 28,
+  userName: {
+    fontSize: 24,
     fontWeight: 'bold',
+    marginTop: 2,
   },
-  button: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  connectionStatus: {
+    marginRight: 15,
   },
-  profileButton: {
-    padding: 8,
+  connectionDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  notificationButton: {
+    padding: 5,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 30,
-  },
-  
-  // Card Styles
-  actionsCard: {
-    marginBottom: 16,
-  },
-  outfitsCard: {
-    marginBottom: 16,
+    paddingHorizontal: 20,
   },
   weatherCard: {
-    marginBottom: 16,
+    marginBottom: 25,
   },
-  statsCard: {
-    marginBottom: 16,
+  weatherGradient: {
+    borderRadius: 16,
+    padding: 20,
   },
-  
-  // Header Styles
-  cardHeader: {
+  weatherContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  weatherLeft: {
+    flex: 1,
+  },
+  weatherTemp: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  weatherDesc: {
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 5,
+  },
+  weatherSuggestion: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.9,
+  },
+  weatherRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickActionsContainer: {
+    marginBottom: 25,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 15,
   },
-  sectionSubtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginTop: 2,
-  },
-  seeAll: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Quick Actions
-  actionsGrid: {
+  quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 8,
   },
-  actionItem: {
-    width: '48%',
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+  quickActionCard: {
+    width: (width - 60) / 2,
+    padding: 20,
     borderRadius: 16,
-    borderWidth: 2,
-    marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 15,
+    alignItems: 'center',
   },
-  actionIcon: {
+  quickActionIcon: {
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -625,196 +593,151 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  actionTitle: {
+  quickActionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 4,
     textAlign: 'center',
   },
-  actionDescription: {
+  quickActionSubtitle: {
     fontSize: 12,
-    opacity: 0.7,
+    color: '#666',
     textAlign: 'center',
   },
-
-  // Outfits List
-  outfitsList: {
-    marginTop: 8,
+  insightsContainer: {
+    marginBottom: 25,
   },
-  outfitsListContent: {
-    paddingRight: 16,
+  insightsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  outfitCard: {
-    width: 180,
-    marginRight: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+  insightCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  insightCardLarge: {
+    width: '100%',
+    marginBottom: 15,
+  },
+  insightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  insightTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 8,
+  },
+  insightTitleSmall: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 6,
+  },
+  insightValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FF8C42',
+    marginBottom: 5,
+  },
+  insightValueSmall: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textTransform: 'capitalize',
+  },
+  insightSubtext: {
+    fontSize: 14,
+    color: '#666',
+  },
+  featuredContainer: {
+    marginBottom: 25,
+  },
+  featureCard: {
+    marginBottom: 15,
     borderRadius: 16,
     overflow: 'hidden',
   },
-  outfitImagePlaceholder: {
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  outfitInfo: {
-    padding: 12,
-  },
-  outfitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  outfitName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-  outfitDescription: {
-    fontSize: 12,
-    opacity: 0.8,
-    marginBottom: 12,
-    lineHeight: 16,
-  },
-  outfitFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  heartButton: {
-    padding: 4,
-  },
-
-  // Weather Card
-  weatherHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  weatherLocation: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginTop: 2,
-  },
-  weatherInfo: {
-    alignItems: 'flex-end',
-  },
-  weatherTemp: {
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
-  weatherCondition: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  weatherSuggestion: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    opacity: 0.8,
-    textAlign: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
-  },
-
-  // Stats Grid
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    opacity: 0.8,
-  },
-
-  // Camera Modal Styles
-  cameraModal: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'space-between',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-  },
-  controlButton: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  captureButton: {
-    backgroundColor: 'white',
-    borderRadius: 40,
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  captureButtonInner: {
-    backgroundColor: 'white',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-  },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  featureGradient: {
     padding: 20,
   },
-  permissionText: {
-    color: 'white',
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 20,
+  featureContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  permissionButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+  featureLeft: {
+    flex: 1,
+    paddingRight: 20,
   },
-  permissionButtonText: {
-    color: 'white',
-    fontSize: 16,
+  featureTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  featureSubtitle: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.9,
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  featureButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  featureButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 6,
+  },
+  featureRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  debugContainer: {
+    marginBottom: 25,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    padding: 15,
+  },
+  debugButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  debugButton: {
+    backgroundColor: '#FF8C42',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.48,
+  },
+  debugButtonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  bottomSpacing: {
+    height: 20,
   },
 });
+
+export default HomeScreen;
