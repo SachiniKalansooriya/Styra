@@ -1,113 +1,97 @@
+// apiService.js
 import API_CONFIG from '../config/api';
 
 class ApiService {
   constructor() {
-    this.urls = [
-      API_CONFIG.primary,
-      API_CONFIG.fallback,
-      API_CONFIG.localhost,
-    ].filter(Boolean);
-    
+    this.baseURL = API_CONFIG.primary;
     this.timeout = API_CONFIG.TIMEOUT;
-    this.headers = API_CONFIG.HEADERS;
   }
 
   async request(endpoint, options = {}) {
-    let lastError;
+    const url = `${this.baseURL}${endpoint}`;
+    const config = {
+      timeout: this.timeout,
+      headers: {
+        ...API_CONFIG.HEADERS,
+        ...options.headers,
+      },
+      ...options,
+    };
 
-    for (const baseUrl of this.urls) {
-      try {
-        const url = `${baseUrl}${endpoint}`;
-        const config = {
-          headers: {
-            ...this.headers,
-            ...options.headers,
-          },
-          ...options,
-        };
-
-        console.log(`Trying API request to: ${url}`);
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-        }, this.timeout);
-        
-        const response = await fetch(url, {
-          ...config,
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log(`API success with ${baseUrl}:`, data);
-        return data;
-      } catch (error) {
-        console.log(`Failed ${baseUrl}:`, error.message);
-        lastError = error;
-        continue;
+    try {
+      const response = await fetch(url, config);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`API request failed: ${endpoint}`, error);
+      throw error;
     }
-    
-    console.error('All API endpoints failed');
-    throw new Error(`All backend connections failed. Last error: ${lastError?.message || 'Unknown'}`);
+  }
+
+  async post(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      ...options,
+    });
+  }
+
+  async postFormData(endpoint, formData, options = {}) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // Don't set Content-Type for FormData, let browser set it
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
   }
 
   async get(endpoint, params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+    const queryString = Object.keys(params).length > 0 
+      ? '?' + new URLSearchParams(params).toString() 
+      : '';
     
-    return this.request(url, {
+    return this.request(`${endpoint}${queryString}`, {
       method: 'GET',
     });
   }
 
-  async post(endpoint, data = {}) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async put(endpoint, data = {}) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async delete(endpoint) {
-    return this.request(endpoint, {
-      method: 'DELETE',
-    });
+  async testConnection() {
+    try {
+      const response = await this.get('/');
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   }
 
   async healthCheck() {
     return this.get('/health');
   }
 
-  async testConnection() {
+  // New method for image analysis
+  async analyzeClothingImage(imageUri) {
     try {
-      const response = await this.get('/');
-      return {
-        success: true,
-        message: 'Backend connection successful',
-        data: response,
-      };
+      const formData = new FormData();
+      formData.append('image', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'clothing_item.jpg',
+      });
+
+      return await this.postFormData('/api/analyze-clothing', formData);
     } catch (error) {
-      return {
-        success: false,
-        message: 'Backend connection failed',
-        error: error.message,
-      };
+      console.error('Image analysis failed:', error);
+      throw error;
     }
   }
 }
 
-const apiService = new ApiService();
-export default apiService;
+export default new ApiService();

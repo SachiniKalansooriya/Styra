@@ -79,7 +79,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
           {item.category} • {item.color}
         </Text>
         <Text style={[styles.itemSeason, { color: theme.text, opacity: 0.6 }]}>
-          {item.season} • Worn {item.timesWorn || 0} times
+          {item.season} • {item.occasion || 'casual'} • Worn {item.timesWorn || 0} times
         </Text>
         {item.pendingSync && (
           <Text style={[styles.syncStatus, { color: '#FFA500' }]}>

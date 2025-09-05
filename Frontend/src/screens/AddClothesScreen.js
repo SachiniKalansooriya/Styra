@@ -32,6 +32,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
     category: '',
     color: '',
     season: 'all',
+    occasion: '',
   });
   const cameraRef = useRef();
 
@@ -47,6 +48,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
         category: processed.suggestedCategory || '',
         color: processed.suggestedColor || '',
         season: 'all',
+        occasion: processed.suggestedOccasion || '',
       });
       
       setShowCategorizeModal(true);
@@ -87,6 +89,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
             category: processed.suggestedCategory || '',
             color: processed.suggestedColor || '',
             season: 'all',
+            occasion: processed.suggestedOccasion || '',
           });
           
           setShowCategorizeModal(true);
@@ -111,54 +114,66 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
     }
   };
 
-  const pickImageFromGallery = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.Images,
-        allowsEditing: true,
-        aspect: [3, 4],
-        quality: 0.7,
-      });
-
-      if (!result.canceled) {
-        Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
-        
-        try {
-          const processed = await cameraBackend.processNewClothingItem(result.assets[0].uri, {
-            captureMethod: 'gallery',
-            timestamp: new Date().toISOString(),
-          });
-          
-          setProcessedItem(processed);
-          setCapturedImage(processed.imageData.localUri);
-          
-          setItemDetails({
-            name: '',
-            category: processed.suggestedCategory || '',
-            color: processed.suggestedColor || '',
-            season: 'all',
-          });
-          
-          setShowCategorizeModal(true);
-        } catch (error) {
-          console.error('Error processing image:', error);
-          Alert.alert('Processing Error', 'Failed to process the selected image. You can still add it manually.', [
-            {
-              text: 'Add Manually',
-              onPress: () => {
-                setCapturedImage(result.assets[0].uri);
-                setShowCategorizeModal(true);
-              }
-            },
-            { text: 'Cancel', style: 'cancel' }
-          ]);
-        }
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
+ const pickImageFromGallery = async () => {
+  try {
+    // Request permissions first
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to select photos.');
+      return;
     }
-  };
 
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+      allowsMultipleSelection: false, // Only single selection
+    });
+
+    if (!result.canceled && result.assets && result.assets[0]) {
+      const selectedImage = result.assets[0];
+      
+      // Show processing indicator
+      Alert.alert('Processing...', 'Analyzing your clothing item...', [], { cancelable: false });
+      
+      try {
+        const processed = await cameraBackend.processNewClothingItem(selectedImage.uri, {
+          captureMethod: 'gallery',
+          timestamp: new Date().toISOString(),
+        });
+        
+        setProcessedItem(processed);
+        setCapturedImage(processed.imageData.localUri);
+        
+        setItemDetails({
+          name: '',
+          category: processed.suggestedCategory || '',
+          color: processed.suggestedColor || '',
+          season: 'all',
+        });
+        
+        setShowCategorizeModal(true);
+        
+      } catch (error) {
+        console.error('Error processing image:', error);
+        Alert.alert('Processing Error', 'Failed to process the selected image. You can still add it manually.', [
+          {
+            text: 'Add Manually',
+            onPress: () => {
+              setCapturedImage(selectedImage.uri);
+              setShowCategorizeModal(true);
+            }
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]);
+      }
+    }
+  } catch (error) {
+    console.error('Gallery error:', error);
+    Alert.alert('Error', 'Failed to access gallery. Please try again.');
+  }
+};
   const saveClothingItem = async () => {
     if (!itemDetails.name || !itemDetails.category) {
       Alert.alert('Missing Information', 'Please fill in at least the item name and category');
@@ -174,6 +189,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
         category: itemDetails.category,
         color: itemDetails.color || processedItem?.suggestedColor || '',
         season: itemDetails.season,
+        occasion: itemDetails.occasion || processedItem?.suggestedOccasion || '',
         image: capturedImage,
         dateAdded: new Date().toISOString(),
         pendingSync: !backendConnected,
@@ -229,7 +245,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
     setShowCategorizeModal(false);
     setCapturedImage(null);
     setProcessedItem(null);
-    setItemDetails({ name: '', category: '', color: '', season: 'all' });
+    setItemDetails({ name: '', category: '', color: '', season: 'all', occasion: '' });
   };
 
   const categories = [
@@ -239,11 +255,27 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
     { key: 'shoes', label: 'Shoes', emoji: '👟' },
     { key: 'accessories', label: 'Accessories', emoji: '👜' },
     { key: 'outerwear', label: 'Outerwear', emoji: '🧥' },
+    { key: 'sportswear', label: 'Sportswear', emoji: '🏃' },
+    { key: 'formal', label: 'Formal', emoji: '🤵' },
+    { key: 'sleepwear', label: 'Sleepwear', emoji: '🛌' },
+    { key: 'underwear', label: 'Underwear', emoji: '🩲' },
   ];
 
   const colors = [
     'Black', 'White', 'Gray', 'Red', 'Blue', 'Green', 
-    'Yellow', 'Pink', 'Purple', 'Brown', 'Orange', 'Beige'
+    'Yellow', 'Pink', 'Purple', 'Brown', 'Orange', 'Beige',
+    'Multicolor', 'Metallic', 'Pastel'
+  ];
+  
+  const occasions = [
+    { key: 'casual', label: 'Casual', emoji: '🏡' },
+    { key: 'formal', label: 'Formal', emoji: '🎭' },
+    { key: 'business', label: 'Business', emoji: '💼' },
+    { key: 'athletic', label: 'Athletic', emoji: '🏋️' },
+    { key: 'beachwear', label: 'Beach', emoji: '🏖️' },
+    { key: 'party', label: 'Party', emoji: '🎉' },
+    { key: 'datenight', label: 'Date Night', emoji: '💕' },
+    { key: 'seasonal', label: 'Seasonal', emoji: '🍂' },
   ];
 
   const seasons = [
@@ -463,6 +495,33 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
                       { color: itemDetails.season === season.key ? 'white' : theme.text }
                     ]}>
                       {season.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.inputSection}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Occasion / Place to Wear</Text>
+              <View style={styles.seasonGrid}>
+                {occasions.map((occasion) => (
+                  <TouchableOpacity
+                    key={occasion.key}
+                    style={[
+                      styles.seasonButton,
+                      {
+                        backgroundColor: itemDetails.occasion === occasion.key 
+                          ? theme.primary 
+                          : 'rgba(255,255,255,0.2)',
+                      }
+                    ]}
+                    onPress={() => setItemDetails(prev => ({ ...prev, occasion: occasion.key }))}
+                  >
+                    <Text style={[
+                      styles.seasonText,
+                      { color: itemDetails.occasion === occasion.key ? 'white' : theme.text }
+                    ]}>
+                      {occasion.emoji} {occasion.label}
                     </Text>
                   </TouchableOpacity>
                 ))}

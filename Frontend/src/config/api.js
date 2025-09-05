@@ -10,16 +10,16 @@ const getApiUrl = () => {
   if (isDevelopment) {
     // Try multiple URLs for development
     return {
-      primary: 'http://172.20.10.7:8000',     // Your computer's IP
-      fallback: 'http://127.0.0.1:8000',      // Localhost
-      localhost: 'http://10.0.2.2:8000',      // Android emulator
+      primary: 'http://172.20.10.7:8000',     // Your ASUS laptop's IP
+      fallback: 'http://localhost:8000',       // Won't work on phone, but useful for web
+      androidEmulator: 'http://10.0.2.2:8000', // For Android emulator only
     };
   }
   
   // Production URL (when you deploy)
   return {
     primary: 'https://your-production-api.com',
-    fallback: 'http://127.0.0.1:8000',
+    fallback: 'http://172.20.10.7:8000',
   };
 };
 

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
-
+import apiService from '../services/apiService';
 const WARDROBE_KEY = 'wardrobe_items';
 const IMAGES_DIRECTORY = FileSystem.documentDirectory + 'styra_images/';
 
@@ -49,16 +49,42 @@ export const cameraBackend = {
   processNewClothingItem: async (imageUri, captureMetadata = {}) => {
     try {
       const imageData = await processAndSaveImage(imageUri);
-      const suggestedColor = await extractColorInfo(imageUri);
-      const suggestedCategory = await suggestCategory(imageUri);
+      
+      // Try to get AI analysis from backend
+      let suggestedColor = 'Unknown';
+      let suggestedCategory = 'tops';
+      let suggestedOccasion = 'casual';  // Initialize with default value
+      let analysisSource = 'fallback';
+      
+      try {
+        console.log('Requesting AI analysis from backend...');
+        const analysisResult = await apiService.analyzeClothingImage(imageUri);
+        
+        if (analysisResult.status === 'success') {
+          suggestedColor = analysisResult.analysis.suggestedColor || suggestedColor;
+          suggestedCategory = analysisResult.analysis.suggestedCategory || suggestedCategory;
+          suggestedOccasion = analysisResult.analysis.suggestedOccasion || 'casual';
+          analysisSource = 'backend_ai';
+          console.log('Backend AI analysis successful:', analysisResult.analysis);
+        }
+      } catch (error) {
+        console.log('Backend analysis failed, using fallback:', error.message);
+        // Fallback to simple local analysis
+        suggestedColor = await extractColorInfo(imageUri);
+        suggestedCategory = await suggestCategory(imageUri);
+        suggestedOccasion = 'casual'; // Set default occasion for fallback
+        analysisSource = 'local_fallback';
+      }
       
       const itemMetadata = {
         id: Date.now().toString(),
         imageData,
         suggestedColor,
         suggestedCategory,
+        suggestedOccasion,
         captureDate: new Date().toISOString(),
         captureMetadata,
+        analysisSource,
         processed: true,
       };
       
