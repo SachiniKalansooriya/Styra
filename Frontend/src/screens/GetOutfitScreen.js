@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import apiService from '../services/apiService';
+import outfitHistoryService from '../services/outfitHistoryService';
 
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
@@ -232,15 +233,74 @@ const handleLikeOutfit = async () => {
     generateOutfit(); // Generate a new outfit
   };
 
-  const handleWearOutfit = () => {
-    Alert.alert(
-      'Outfit Selected!',
-      'This outfit has been marked as worn today.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Confirm', onPress: () => navigation.goBack() },
-      ]
-    );
+  const handleWearOutfit = async () => {
+    if (!currentOutfit || !currentOutfit.items) {
+      Alert.alert('Error', 'No outfit to record');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Get current location for context (optional)
+      let location = null;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const locationData = await Location.getCurrentPositionAsync({});
+          const reverseGeocode = await Location.reverseGeocodeAsync({
+            latitude: locationData.coords.latitude,
+            longitude: locationData.coords.longitude,
+          });
+          
+          if (reverseGeocode.length > 0) {
+            const address = reverseGeocode[0];
+            location = `${address.city || ''}, ${address.region || ''}`.trim().replace(/^,|,$/, '');
+          }
+        }
+      } catch (locationError) {
+        console.log('Could not get location:', locationError);
+      }
+
+      // Format outfit data for storage
+      const outfitData = outfitHistoryService.formatOutfitForStorage(
+        currentOutfit.items,
+        selectedOccasion,
+        currentOutfit.confidence
+      );
+
+      // Record the worn outfit
+      const result = await outfitHistoryService.recordWornOutfit(
+        outfitData,
+        selectedOccasion,
+        currentWeather?.condition || null,
+        location,
+        outfitHistoryService.getTodayDate()
+      );
+
+      if (result.status === 'success') {
+        Alert.alert(
+          'Outfit Recorded!',
+          `This outfit has been saved to your history for ${outfitHistoryService.getTodayDate()}.`,
+          [
+            { text: 'View History', onPress: () => navigation.navigate('OutfitHistory') },
+            { text: 'Generate New Outfit', onPress: generateOutfit },
+            { text: 'OK', style: 'default' }
+          ]
+        );
+      } else {
+        throw new Error(result.message || 'Failed to record outfit');
+      }
+    } catch (error) {
+      console.error('Error recording outfit:', error);
+      Alert.alert(
+        'Error',
+        'Failed to record outfit. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderOccasionSelector = () => (

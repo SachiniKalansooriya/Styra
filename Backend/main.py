@@ -12,7 +12,9 @@ from image_analysis import image_analysis_service
 from services.analysis_history_service import analysis_history_service
 from services.wardrobe_service import wardrobe_service
 from services.image_storage_service import image_storage_service
-from services.trip_ai_service import trip_ai_service
+from services.trip_ai_service import TripAIService
+from services.outfit_history_service import OutfitHistoryService
+from services.trip_ai_generator import trip_ai_generator
 from services.enhanced_outfit_service import enhanced_outfit_service
 from datetime import datetime
 import json
@@ -27,24 +29,45 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Initialize services
+trip_ai_service = None
+outfit_history_service = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize services on startup and cleanup on shutdown"""
     # Startup
+    global trip_ai_service, outfit_history_service
+    
     try:
         # Test the image analysis service
         service_status = image_analysis_service.get_service_info()
         logger.info(f"Image analysis service initialized: {service_status}")
         
-        # Test database connection
+        # Initialize trip AI generator
+        if trip_ai_generator.load_ai_models():
+            logger.info("Trip AI generator initialized successfully")
+        else:
+            logger.warning("Trip AI generator failed to initialize - using fallback mode")
+        
+        # Initialize trip AI service
+        trip_ai_service = TripAIService()
+        logger.info("Trip AI service initialized")
+        
+        # Test database connection and initialize outfit history service
         DATABASE_URL = os.getenv("DATABASE_URL")
         if DATABASE_URL:
             try:
                 conn = psycopg2.connect(DATABASE_URL)
-                conn.close()
-                logger.info("Database connection successful")
+                # Don't close the connection - keep it for the service
+                outfit_history_service = OutfitHistoryService(conn)
+                logger.info("Database connection successful and outfit history service initialized")
             except Exception as e:
                 logger.warning(f"Database connection failed: {e}")
+                outfit_history_service = None
+        else:
+            logger.warning("DATABASE_URL not found in environment variables")
+            outfit_history_service = None
         
         logger.info("Styra AI Backend started successfully!")
         
@@ -684,11 +707,23 @@ async def enhanced_packing_recommendations(request_data: dict):
         logger.info(f"Wardrobe items count: {len(wardrobe_items)}")
         logger.info(f"Duration: {duration}")
         
-        # Use the AI service for intelligent analysis
-        wardrobe_analysis = trip_ai_service.analyze_wardrobe_for_trip(wardrobe_items, trip_details)
-        recommendations = trip_ai_service.generate_enhanced_trip_recommendations(trip_details, wardrobe_analysis, duration)
-        wardrobe_matches = trip_ai_service.find_detailed_wardrobe_matches(recommendations, wardrobe_items)
-        coverage = trip_ai_service.calculate_detailed_wardrobe_coverage(wardrobe_items, recommendations)
+        # Use the new AI trip generator for intelligent analysis
+        if trip_ai_generator.ai_loaded:
+            logger.info("Using AI-powered trip planning")
+            recommendations = trip_ai_generator.generate_intelligent_packing_list(trip_details, wardrobe_items, duration)
+            
+            # Also get traditional analysis for comparison
+            wardrobe_analysis = trip_ai_service.analyze_wardrobe_for_trip(wardrobe_items, trip_details)
+            wardrobe_matches = trip_ai_service.find_detailed_wardrobe_matches(recommendations, wardrobe_items)
+            coverage = trip_ai_service.calculate_detailed_wardrobe_coverage(wardrobe_items, recommendations)
+            
+        else:
+            logger.info("Using traditional trip analysis (AI not available)")
+            # Fallback to traditional service
+            wardrobe_analysis = trip_ai_service.analyze_wardrobe_for_trip(wardrobe_items, trip_details)
+            recommendations = trip_ai_service.generate_enhanced_trip_recommendations(trip_details, wardrobe_analysis, duration)
+            wardrobe_matches = trip_ai_service.find_detailed_wardrobe_matches(recommendations, wardrobe_items)
+            coverage = trip_ai_service.calculate_detailed_wardrobe_coverage(wardrobe_items, recommendations)
         
         logger.info("Enhanced packing recommendations generated successfully")
         
@@ -826,6 +861,119 @@ async def process_outfit_feedback(feedback_data: dict):
     except Exception as e:
         logger.error(f"Feedback processing error: {e}")
         raise HTTPException(status_code=500, detail="Failed to process feedback")
+
+# Outfit History Routes
+@app.post("/api/outfit/wear")
+async def record_worn_outfit(request_data: dict):
+    """Record that user wore a specific outfit"""
+    try:
+        if not outfit_history_service:
+            raise HTTPException(status_code=503, detail="Outfit history service not available")
+        
+        outfit_data = request_data.get('outfit_data', {})
+        user_id = request_data.get('user_id', 1)
+        occasion = request_data.get('occasion')
+        weather = request_data.get('weather')
+        location = request_data.get('location')
+        worn_date = request_data.get('worn_date')
+        
+        if not outfit_data:
+            raise HTTPException(status_code=400, detail="Outfit data is required")
+        
+        logger.info(f"Recording worn outfit for user {user_id}")
+        
+        result = outfit_history_service.record_worn_outfit(
+            outfit_data=outfit_data,
+            user_id=user_id,
+            occasion=occasion,
+            weather=weather,
+            location=location,
+            worn_date=worn_date
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Record worn outfit error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to record outfit: {str(e)}")
+
+@app.get("/api/outfit/history")
+async def get_outfit_history(user_id: int = 1, limit: int = 50, start_date: str = None, end_date: str = None):
+    """Get user's outfit history"""
+    try:
+        if not outfit_history_service:
+            raise HTTPException(status_code=503, detail="Outfit history service not available")
+        
+        logger.info(f"Getting outfit history for user {user_id}")
+        
+        result = outfit_history_service.get_user_outfit_history(
+            user_id=user_id,
+            limit=limit,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get outfit history error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit history: {str(e)}")
+
+@app.get("/api/outfit/history/{worn_date}")
+async def get_outfit_by_date(worn_date: str, user_id: int = 1):
+    """Get outfit worn on a specific date"""
+    try:
+        if not outfit_history_service:
+            raise HTTPException(status_code=503, detail="Outfit history service not available")
+        
+        logger.info(f"Getting outfit for user {user_id} on {worn_date}")
+        
+        result = outfit_history_service.get_outfit_by_date(
+            worn_date=worn_date,
+            user_id=user_id
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get outfit by date error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
+
+@app.post("/api/outfit/rate")
+async def rate_outfit(request_data: dict):
+    """Rate a worn outfit"""
+    try:
+        if not outfit_history_service:
+            raise HTTPException(status_code=503, detail="Outfit history service not available")
+        
+        outfit_id = request_data.get('outfit_id')
+        rating = request_data.get('rating')
+        notes = request_data.get('notes')
+        
+        if not outfit_id or not rating:
+            raise HTTPException(status_code=400, detail="Outfit ID and rating are required")
+        
+        logger.info(f"Rating outfit {outfit_id} with {rating} stars")
+        
+        result = outfit_history_service.rate_outfit(
+            outfit_id=outfit_id,
+            rating=rating,
+            notes=notes
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Rate outfit error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rate outfit: {str(e)}")
 
 @app.get("/api/outfit/recommendations/{user_id}")
 async def get_daily_recommendations(user_id: int, lat: float = 40.7128, lon: float = -74.0060):

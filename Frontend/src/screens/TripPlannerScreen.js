@@ -10,9 +10,11 @@ import {
   ScrollView,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import tripPlannerService from '../services/tripPlannerService';
 
 const TripPlannerScreen = ({ navigation }) => {
   const [tripDetails, setTripDetails] = useState({
@@ -27,6 +29,7 @@ const TripPlannerScreen = ({ navigation }) => {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+  const [loading, setLoading] = useState(false);
   
   const activities = [
     'Business Meetings',
@@ -59,9 +62,17 @@ const TripPlannerScreen = ({ navigation }) => {
     }));
   };
 
-  const handleGeneratePackingList = () => {
+  const handleGeneratePackingList = async () => {
+    console.log('=== TRIP PLANNER DEBUG ===');
+    console.log('Current tripDetails:', tripDetails);
+    
     if (!tripDetails.destination.trim()) {
       Alert.alert('Missing Information', 'Please enter your destination.');
+      return;
+    }
+    
+    if (!tripDetails.weatherExpected) {
+      Alert.alert('Missing Information', 'Please select the expected weather.');
       return;
     }
     
@@ -70,9 +81,37 @@ const TripPlannerScreen = ({ navigation }) => {
       return;
     }
 
-    // Navigate to packing list results
-    navigation.navigate('PackingListResults', { tripDetails });
-  };
+    setLoading(true);
+  
+  try {
+    console.log('Starting packing list generation...');
+    
+    const packingResult = await tripPlannerService.generateSmartPackingList(tripDetails);
+    console.log('Packing result received:', packingResult);
+    
+    // Validate the result before navigation
+    if (!packingResult) {
+      throw new Error('No packing result received');
+    }
+    
+    // Simple navigation test first
+    console.log('Attempting navigation...');
+    navigation.navigate('PackingListResults', { 
+      tripDetails,
+      packingResult
+    });
+    
+  } catch (error) {
+    console.error('Complete error details:', error);
+    Alert.alert(
+      'Debug Info', 
+      `Error: ${error.message}\nStack: ${error.stack}`,
+      [{ text: 'OK' }]
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
@@ -172,6 +211,40 @@ const TripPlannerScreen = ({ navigation }) => {
             <Text style={styles.durationText}>
               Duration: {getDuration()} {getDuration() === 1 ? 'day' : 'days'}
             </Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Expected Weather</Text>
+          <View style={styles.weatherContainer}>
+            {['sunny', 'rainy', 'cold', 'hot', 'mild', 'mixed'].map((weather) => (
+              <TouchableOpacity
+                key={weather}
+                style={[
+                  styles.weatherButton,
+                  tripDetails.weatherExpected === weather && styles.selectedWeatherButton
+                ]}
+                onPress={() => setTripDetails(prev => ({ ...prev, weatherExpected: weather }))}
+              >
+                <Ionicons 
+                  name={
+                    weather === 'sunny' ? 'sunny' :
+                    weather === 'rainy' ? 'rainy' :
+                    weather === 'cold' ? 'snow' :
+                    weather === 'hot' ? 'flame' :
+                    weather === 'mild' ? 'partly-sunny' : 'cloud'
+                  } 
+                  size={20} 
+                  color={tripDetails.weatherExpected === weather ? '#fff' : '#666'} 
+                />
+                <Text style={[
+                  styles.weatherButtonText,
+                  tripDetails.weatherExpected === weather && styles.selectedWeatherButtonText
+                ]}>
+                  {weather.charAt(0).toUpperCase() + weather.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -497,6 +570,30 @@ const styles = StyleSheet.create({
  activityText: {
    fontSize: 16,
    color: '#333',
+ },
+ weatherContainer: {
+   flexDirection: 'row',
+   flexWrap: 'wrap',
+   gap: 10,
+ },
+ weatherButton: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   backgroundColor: '#f0f0f0',
+   paddingHorizontal: 12,
+   paddingVertical: 8,
+   borderRadius: 20,
+   gap: 5,
+ },
+ selectedWeatherButton: {
+   backgroundColor: '#FF8C42',
+ },
+ weatherButtonText: {
+   fontSize: 14,
+   color: '#666',
+ },
+ selectedWeatherButtonText: {
+   color: '#fff',
  },
 });
 

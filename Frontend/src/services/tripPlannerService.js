@@ -22,15 +22,20 @@ class TripPlannerService {
           duration
         });
         
+        console.log('Backend response:', backendResponse);
+        
         if (backendResponse.status === 'success') {
+          // Return the backend recommendations in the expected format
           return {
-            ...packingList,
-            recommendations: backendResponse.recommendations,
-            wardrobeMatches: backendResponse.wardrobeMatches
+            categories: backendResponse.recommendations || [],
+            wardrobeMatches: backendResponse.wardrobeMatches || {},
+            analysis: backendResponse.analysis || {},
+            coverage: backendResponse.coverage || {},
+            source: 'backend'
           };
         }
       } catch (error) {
-        console.log('Backend enhancement failed, using local generation');
+        console.log('Backend enhancement failed, using local generation:', error);
       }
       
       return packingList;

@@ -455,6 +455,35 @@ const HomeScreen = ({ navigation }) => {
                 </View>
               </LinearGradient>
             </TouchableOpacity>
+
+            {/* Outfit History Feature Card */}
+            <TouchableOpacity 
+              style={styles.featureCard}
+              onPress={() => navigation.navigate('OutfitHistory')}
+            >
+              <LinearGradient
+                colors={['#a8edea', '#fed6e3']}
+                style={styles.featureGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.featureContent}>
+                  <View style={styles.featureLeft}>
+                    <Text style={[styles.featureTitle, { color: '#2D3436' }]}>Style History</Text>
+                    <Text style={[styles.featureSubtitle, { color: '#636E72' }]}>
+                      Track your outfits and style journey
+                    </Text>
+                    <View style={[styles.featureButton, { backgroundColor: '#2D3436' }]}>
+                      <Text style={styles.featureButtonText}>View History</Text>
+                      <Ionicons name="time" size={16} color="#fff" />
+                    </View>
+                  </View>
+                  <View style={styles.featureRight}>
+                    <Ionicons name="calendar" size={50} color="#2D3436" />
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
 
           {/* Debug Panel */}
