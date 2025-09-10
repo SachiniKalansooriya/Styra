@@ -19,6 +19,7 @@ import outfitHistoryService from '../services/outfitHistoryService';
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [regeneratingItem, setRegeneratingItem] = useState(null); // Track which item is being regenerated
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [occasion, setOccasion] = useState('casual');
   const [location, setLocation] = useState(null);
@@ -212,6 +213,58 @@ const generateOutfit = async () => {
   }
 };
 
+const regenerateItem = async (itemCategory) => {
+  if (!currentOutfit) return;
+  
+  try {
+    setRegeneratingItem(itemCategory);
+    
+    // Find the current item in this category to exclude it
+    const currentItem = currentOutfit.items ? 
+      currentOutfit.items.find(item => 
+        item.category && item.category.toLowerCase() === itemCategory.toLowerCase()
+      ) : null;
+    
+    const requestData = {
+      current_outfit: currentOutfit,
+      item_category: itemCategory,
+      current_item_id: currentItem ? currentItem.id : null, // Add current item ID
+      occasion: occasion,
+      user_id: 1,
+      user_preferences: {
+        occasion: occasion,
+        weather: weatherInfo?.condition || 'mild',
+        style: 'casual'
+      }
+    };
+    
+    console.log('Regenerating item:', itemCategory, 'Current item ID:', currentItem?.id, requestData);
+    
+    const response = await apiService.post('/api/outfit/regenerate-item', requestData);
+    
+    if (response && response.status === 'success') {
+      setCurrentOutfit(response.outfit);
+      
+      // Show more detailed success message
+      const newItemName = response.replaced_item?.new_item || 'new item';
+      const alternativesCount = response.replaced_item?.alternatives_available || 0;
+      
+      Alert.alert(
+        'Item Updated!', 
+        `New ${itemCategory}: ${newItemName}${alternativesCount > 0 ? ` (${alternativesCount} more alternatives available)` : ''}`,
+        [{ text: 'OK' }]
+      );
+    } else {
+      Alert.alert('Error', response.message || 'Failed to regenerate item');
+    }
+  } catch (error) {
+    console.error('Error regenerating item:', error);
+    Alert.alert('Error', 'Failed to regenerate item. Please try again.');
+  } finally {
+    setRegeneratingItem(null);
+  }
+};
+
 const handleLikeOutfit = async () => {
   if (!currentOutfit) return;
   
@@ -263,25 +316,27 @@ const handleLikeOutfit = async () => {
       }
 
       // Format outfit data for storage
-      const outfitData = outfitHistoryService.formatOutfitForStorage(
-        currentOutfit.items,
-        selectedOccasion,
-        currentOutfit.confidence
-      );
+      const outfitData = {
+        items: currentOutfit.items,
+        occasion: occasion,
+        confidence: currentOutfit.confidence,
+        reason: currentOutfit.reason
+      };
 
-      // Record the worn outfit
-      const result = await outfitHistoryService.recordWornOutfit(
-        outfitData,
-        selectedOccasion,
-        currentWeather?.condition || null,
-        location,
-        outfitHistoryService.getTodayDate()
-      );
+      // Record the worn outfit using the backend API
+      const result = await apiService.post('/api/outfit/wear', {
+        outfit_data: outfitData,
+        user_id: 1,
+        occasion: occasion,
+        weather: weatherInfo?.condition || mockWeatherData.condition,
+        location: location,
+        worn_date: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+      });
 
-      if (result.status === 'success') {
+      if (result && result.status === 'success') {
         Alert.alert(
           'Outfit Recorded!',
-          `This outfit has been saved to your history for ${outfitHistoryService.getTodayDate()}.`,
+          `This outfit has been saved to your history for today.`,
           [
             { text: 'View History', onPress: () => navigation.navigate('OutfitHistory') },
             { text: 'Generate New Outfit', onPress: generateOutfit },
@@ -289,7 +344,7 @@ const handleLikeOutfit = async () => {
           ]
         );
       } else {
-        throw new Error(result.message || 'Failed to record outfit');
+        throw new Error(result?.message || 'Failed to record outfit');
       }
     } catch (error) {
       console.error('Error recording outfit:', error);
@@ -370,13 +425,41 @@ const handleLikeOutfit = async () => {
 
           <View style={styles.itemsContainer}>
             {currentOutfit.items && currentOutfit.items.map((item, index) => (
-              <View key={item.id || index} style={styles.outfitItem}>
-                <Image 
-                  source={{ uri: item.image_path ? `http://172.20.10.7:8000${item.image_path}` : 'https://via.placeholder.com/150' }} 
-                  style={styles.itemImage} 
-                />
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemCategory}>{item.category}</Text>
+              <View key={item.id || index} style={styles.outfitItemRow}>
+                <View style={styles.itemDisplayContainer}>
+                  <Image 
+                    source={{ uri: item.image_path ? `http://172.20.10.7:8000${item.image_path}` : 'https://via.placeholder.com/150' }} 
+                    style={styles.itemImage} 
+                  />
+                  <View style={styles.itemDetails}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemCategory}>{item.category}</Text>
+                    {item.color && (
+                      <Text style={styles.itemColor}>Color: {item.color}</Text>
+                    )}
+                    {item.brand && (
+                      <Text style={styles.itemBrand}>{item.brand}</Text>
+                    )}
+                  </View>
+                </View>
+                
+                <TouchableOpacity 
+                  style={[
+                    styles.retryItemButton,
+                    regeneratingItem === item.category && styles.buttonDisabled
+                  ]}
+                  onPress={() => regenerateItem(item.category)}
+                  disabled={regeneratingItem === item.category || loading}
+                >
+                  {regeneratingItem === item.category ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="refresh" size={16} color="#fff" />
+                  )}
+                  <Text style={styles.retryItemText}>
+                    {regeneratingItem === item.category ? 'Finding...' : `Try Another`}
+                  </Text>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -574,32 +657,58 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   itemsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: 'column',
     marginBottom: 20,
+  },
+  outfitItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginBottom: 10,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+  },
+  itemDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   outfitItem: {
     alignItems: 'center',
     flex: 1,
   },
   itemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
     backgroundColor: '#f0f0f0',
-    marginBottom: 8,
+    marginRight: 12,
+  },
+  itemDetails: {
+    flex: 1,
   },
   itemName: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    textAlign: 'center',
     marginBottom: 2,
   },
   itemCategory: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#666',
-    textAlign: 'center',
+    marginBottom: 1,
+  },
+  itemColor: {
+    fontSize: 11,
+    color: '#888',
+    marginBottom: 1,
+  },
+  itemBrand: {
+    fontSize: 11,
+    color: '#888',
+    fontStyle: 'italic',
   },
   reasonContainer: {
     backgroundColor: '#f8f8f8',
@@ -690,6 +799,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  retryItemButton: {
+    backgroundColor: '#FF8C42',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  retryItemText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 

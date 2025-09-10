@@ -899,6 +899,143 @@ async def record_worn_outfit(request_data: dict):
         logger.error(f"Record worn outfit error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to record outfit: {str(e)}")
 
+@app.post("/api/outfit/regenerate-item")
+async def regenerate_single_item(request_data: dict):
+    """Regenerate a single item while keeping others in the outfit"""
+    try:
+        current_outfit = request_data.get('current_outfit', {})
+        item_category = request_data.get('item_category')  # e.g., 'tops', 'bottoms', 'shoes'
+        occasion = request_data.get('occasion', 'casual')
+        user_id = request_data.get('user_id', 1)
+        
+        if not current_outfit or not item_category:
+            raise HTTPException(status_code=400, detail="Current outfit and item category are required")
+        
+        logger.info(f"Regenerating {item_category} for user {user_id}, occasion: {occasion}")
+        
+        # Get user's wardrobe items
+        wardrobe_items = wardrobe_service.get_wardrobe_items()
+        
+        # Filter items by category
+        category_items = [item for item in wardrobe_items if item.get('category', '').lower() == item_category.lower()]
+        
+        if not category_items:
+            return {
+                "status": "error",
+                "message": f"No {item_category} items found in wardrobe"
+            }
+        
+        # Get current items in outfit (excluding the one we're replacing)
+        current_items = current_outfit.get('items', [])
+        
+        # Find the current item being replaced to exclude it
+        current_item_id = None
+        for item in current_items:
+            if item.get('category', '').lower() == item_category.lower():
+                current_item_id = item.get('id')
+                break
+        
+        # Filter items by category and exclude current item
+        category_items = [
+            item for item in wardrobe_items 
+            if item.get('category', '').lower() == item_category.lower() 
+            and item.get('id') != current_item_id  # Exclude current item
+        ]
+        
+        if not category_items:
+            return {
+                "status": "error",
+                "message": f"No alternative {item_category} items found in wardrobe"
+            }
+        
+        logger.info(f"Found {len(category_items)} alternative {item_category} items (excluding current)")
+        
+        # Find items that match the current outfit style and occasion
+        suitable_items = []
+        for item in category_items:
+            # Basic compatibility check (can be enhanced with AI)
+            item_occasions = item.get('suitable_occasions', [])
+            if not item_occasions or occasion in item_occasions:
+                suitable_items.append(item)
+        
+        if not suitable_items:
+            # If no suitable items found, use all category items (already excludes current)
+            suitable_items = category_items
+        
+        if not suitable_items:
+            return {
+                "status": "error",
+                "message": f"No alternative {item_category} items available"
+            }
+        
+        # Select a random item to ensure variety
+        import random
+        new_item = random.choice(suitable_items)
+        
+        # Create the updated outfit
+        updated_items = []
+        item_replaced = False
+        
+        for item in current_items:
+            if item.get('category', '').lower() == item_category.lower():
+                # Replace with new item
+                updated_items.append({
+                    'id': new_item.get('id'),
+                    'name': new_item.get('name'),
+                    'category': new_item.get('category'),
+                    'image_path': new_item.get('image_path'),
+                    'image_url': f"/static/images/wardrobe/{new_item.get('image_path')}" if new_item.get('image_path') else None,
+                    'color': new_item.get('color'),
+                    'brand': new_item.get('brand')
+                })
+                item_replaced = True
+            else:
+                # Keep existing item
+                updated_items.append(item)
+        
+        # If no item was replaced, add the new item
+        if not item_replaced:
+            updated_items.append({
+                'id': new_item.get('id'),
+                'name': new_item.get('name'),
+                'category': new_item.get('category'),
+                'image_path': new_item.get('image_path'),
+                'image_url': f"/static/images/wardrobe/{new_item.get('image_path')}" if new_item.get('image_path') else None,
+                'color': new_item.get('color'),
+                'brand': new_item.get('brand')
+            })
+        
+        # Calculate new confidence (basic algorithm)
+        # TODO: Enhance with AI-based compatibility scoring
+        base_confidence = current_outfit.get('confidence', 85)
+        new_confidence = max(75, min(95, base_confidence + (5 if len(suitable_items) > 3 else -5)))
+        
+        updated_outfit = {
+            'id': current_outfit.get('id', 'updated'),
+            'items': updated_items,
+            'confidence': new_confidence,
+            'reason': f"Updated {item_category} for better style match",
+            'occasion': occasion
+        }
+        
+        logger.info(f"Successfully regenerated {item_category}: {new_item.get('name')}")
+        
+        return {
+            "status": "success",
+            "outfit": updated_outfit,
+            "replaced_item": {
+                'category': item_category,
+                'new_item': new_item.get('name'),
+                'alternatives_available': len(suitable_items) - 1
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Regenerate item error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to regenerate item: {str(e)}")
+
 @app.get("/api/outfit/history")
 async def get_outfit_history(user_id: int = 1, limit: int = 50, start_date: str = None, end_date: str = None):
     """Get user's outfit history"""
