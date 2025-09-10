@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import apiService from '../services/apiService';
 import outfitHistoryService from '../services/outfitHistoryService';
+import favoriteOutfitService from '../services/favoriteOutfitService';
 
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
@@ -358,6 +359,74 @@ const handleLikeOutfit = async () => {
     }
   };
 
+  const handleSaveFavorite = async () => {
+    if (!currentOutfit || !currentOutfit.items) {
+      Alert.alert('Error', 'No outfit to save as favorite');
+      return;
+    }
+
+    Alert.prompt(
+      'Save as Favorite',
+      'Give this outfit a name:',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Save',
+          onPress: async (outfitName) => {
+            if (!outfitName || outfitName.trim() === '') {
+              outfitName = `Outfit ${new Date().toLocaleDateString()}`;
+            }
+
+            try {
+              setLoading(true);
+
+              const outfitData = {
+                items: currentOutfit.items,
+                occasion: occasion,
+                confidence: currentOutfit.confidence,
+                reason: currentOutfit.reason,
+                weather_context: weatherInfo || mockWeatherData
+              };
+
+              const result = await favoriteOutfitService.saveFavorite(
+                1, // user_id
+                outfitData,
+                outfitName.trim()
+              );
+
+              if (result && result.success) {
+                Alert.alert(
+                  'Saved!',
+                  `"${outfitName}" has been saved to your favorites.`,
+                  [
+                    { text: 'View Favorites', onPress: () => navigation.navigate('FavoriteOutfits') },
+                    { text: 'OK', style: 'default' }
+                  ]
+                );
+              } else {
+                throw new Error(result?.message || 'Failed to save favorite');
+              }
+            } catch (error) {
+              console.error('Error saving favorite:', error);
+              Alert.alert(
+                'Error',
+                'Failed to save outfit as favorite. Please try again.',
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+      'plain-text',
+      `Outfit ${new Date().toLocaleDateString()}`
+    );
+  };
+
   const renderOccasionSelector = () => (
     <ScrollView 
       horizontal 
@@ -517,6 +586,14 @@ const handleLikeOutfit = async () => {
           >
             <Ionicons name="thumbs-down" size={20} color="#fff" />
             <Text style={styles.buttonText}>Try Again</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.favoriteButton} 
+            onPress={handleSaveFavorite}
+          >
+            <Ionicons name="heart-outline" size={20} color="#fff" />
+            <Text style={styles.buttonText}>Favorite</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -736,6 +813,16 @@ const styles = StyleSheet.create({
   dislikeButton: {
     flex: 1,
     backgroundColor: '#666',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginRight: 5,
+  },
+  favoriteButton: {
+    flex: 1,
+    backgroundColor: '#9b59b6',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

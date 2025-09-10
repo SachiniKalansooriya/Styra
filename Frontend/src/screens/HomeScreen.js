@@ -271,6 +271,14 @@ const HomeScreen = ({ navigation }) => {
       icon: 'bag',
       color: '#FF8C42',
       onPress: () => navigation.navigate('TripPlanner')
+    },
+    {
+      id: 'favorites',
+      title: 'Favorites',
+      subtitle: 'Saved outfits',
+      icon: 'heart',
+      color: '#9b59b6',
+      onPress: () => navigation.navigate('FavoriteOutfits')
     }
   ];
 

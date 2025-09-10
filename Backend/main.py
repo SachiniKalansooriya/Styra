@@ -16,6 +16,7 @@ from services.trip_ai_service import TripAIService
 from services.outfit_history_service import OutfitHistoryService
 from services.trip_ai_generator import trip_ai_generator
 from services.enhanced_outfit_service import enhanced_outfit_service
+from services.favorite_outfit_service import favorite_outfit_service
 from datetime import datetime
 import json
 import glob
@@ -1306,6 +1307,118 @@ async def validate_outfit_combination(combination_data: dict):
     except Exception as e:
         logger.error(f"Outfit validation error: {e}")
         raise HTTPException(status_code=500, detail="Failed to validate outfit combination")
+
+# Favorite outfit endpoints
+@app.post("/api/outfit/favorites/save")
+async def save_favorite_outfit(request_data: dict):
+    """Save an outfit as favorite"""
+    try:
+        user_id = request_data.get('user_id', 1)
+        outfit_data = request_data.get('outfit_data', {})
+        outfit_name = request_data.get('outfit_name')
+        
+        if not outfit_data or not outfit_data.get('items'):
+            raise HTTPException(status_code=400, detail="Outfit data is required")
+        
+        logger.info(f"Saving favorite outfit for user {user_id}")
+        
+        result = favorite_outfit_service.save_favorite_outfit(
+            user_id=user_id,
+            outfit_data=outfit_data,
+            outfit_name=outfit_name
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save favorite outfit error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save favorite outfit: {str(e)}")
+
+@app.get("/api/outfit/favorites/{user_id}")
+async def get_user_favorites(user_id: int):
+    """Get all favorite outfits for a user"""
+    try:
+        logger.info(f"Getting favorite outfits for user {user_id}")
+        
+        favorites = favorite_outfit_service.get_user_favorites(user_id)
+        
+        return {
+            "status": "success",
+            "favorites": favorites,
+            "count": len(favorites)
+        }
+        
+    except Exception as e:
+        logger.error(f"Get favorites error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get favorites: {str(e)}")
+
+@app.get("/api/outfit/favorites/{user_id}/{favorite_id}")
+async def get_favorite_by_id(user_id: int, favorite_id: int):
+    """Get a specific favorite outfit"""
+    try:
+        favorite = favorite_outfit_service.get_favorite_by_id(user_id, favorite_id)
+        
+        if not favorite:
+            raise HTTPException(status_code=404, detail="Favorite outfit not found")
+        
+        return {
+            "status": "success",
+            "favorite": favorite
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get favorite by ID error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get favorite: {str(e)}")
+
+@app.put("/api/outfit/favorites/{user_id}/{favorite_id}")
+async def update_favorite_outfit(user_id: int, favorite_id: int, request_data: dict):
+    """Update a favorite outfit"""
+    try:
+        logger.info(f"Updating favorite outfit {favorite_id} for user {user_id}")
+        
+        result = favorite_outfit_service.update_favorite(
+            user_id=user_id,
+            favorite_id=favorite_id,
+            updates=request_data
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Update favorite error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update favorite: {str(e)}")
+
+@app.delete("/api/outfit/favorites/{user_id}/{favorite_id}")
+async def delete_favorite_outfit(user_id: int, favorite_id: int):
+    """Delete a favorite outfit"""
+    try:
+        logger.info(f"Deleting favorite outfit {favorite_id} for user {user_id}")
+        
+        result = favorite_outfit_service.delete_favorite(user_id, favorite_id)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Delete favorite error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete favorite: {str(e)}")
+
+@app.post("/api/outfit/favorites/{user_id}/{favorite_id}/wear")
+async def wear_favorite_outfit(user_id: int, favorite_id: int):
+    """Mark a favorite outfit as worn"""
+    try:
+        logger.info(f"Marking favorite outfit {favorite_id} as worn for user {user_id}")
+        
+        result = favorite_outfit_service.wear_favorite_outfit(user_id, favorite_id)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Wear favorite outfit error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to mark outfit as worn: {str(e)}")
 
 # System information endpoints
 @app.get("/api/system/info")

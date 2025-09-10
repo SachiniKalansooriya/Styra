@@ -12,7 +12,7 @@ import TripPlannerScreen from '../screens/TripPlannerScreen';
 import GetOutfitScreen from '../screens/GetOutfitScreen';
 import PackingListResultsScreen from '../screens/PackingListResultsScreen';
 import OutfitHistoryScreen from '../screens/OutfitHistoryScreen';
-import OutfitHistoryScreen from '../screens/OutfitHistoryScreen';
+import FavoriteOutfitsScreen from '../screens/FavoriteOutfitsScreen';
 
 const Stack = createStackNavigator();
 
@@ -51,6 +51,7 @@ export const AppNavigator = () => {
         <Stack.Screen name="GetOutfit" component={GetOutfitScreen} />
         <Stack.Screen name="PackingListResults" component={PackingListResultsScreen} />
         <Stack.Screen name="OutfitHistory" component={OutfitHistoryScreen} />
+        <Stack.Screen name="FavoriteOutfits" component={FavoriteOutfitsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
