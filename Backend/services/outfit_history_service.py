@@ -24,12 +24,17 @@ class OutfitHistoryService:
         try:
             if not worn_date:
                 worn_date = datetime.now().date()
+            elif isinstance(worn_date, str):
+                # Convert string date to date object
+                worn_date = datetime.fromisoformat(worn_date).date()
             
             # Check if outfit already recorded for this date
-            existing = self.outfit_history.get_outfit_by_date(user_id, worn_date)
-            if existing:
-                logger.warning(f"Outfit already recorded for {worn_date}, updating...")
-                # Could implement update logic here
+            try:
+                existing = self.outfit_history.get_outfit_by_date(user_id, worn_date)
+                if existing:
+                    logger.warning(f"Outfit already recorded for {worn_date}, will still save new entry...")
+            except Exception as e:
+                logger.warning(f"Error checking existing outfit: {e}")
             
             # Save the outfit
             outfit_id = self.outfit_history.save_worn_outfit(

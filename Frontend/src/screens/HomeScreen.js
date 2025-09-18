@@ -282,6 +282,17 @@ const HomeScreen = ({ navigation }) => {
         console.log('Navigating to FavoriteOutfits screen');
         navigation.navigate('FavoriteOutfits');
       }
+    },
+    {
+      id: 'worn-outfits',
+      title: 'Worn Outfits',
+      subtitle: 'Outfit history',
+      icon: 'checkmark-circle',
+      color: '#2ecc71',
+      onPress: () => {
+        console.log('Navigating to WornOutfits screen');
+        navigation.navigate('WornOutfits');
+      }
     }
   ];
 
@@ -467,10 +478,10 @@ const HomeScreen = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Outfit History Feature Card */}
+            {/* Worn Outfits Feature Card */}
             <TouchableOpacity 
               style={styles.featureCard}
-              onPress={() => navigation.navigate('OutfitHistory')}
+              onPress={() => navigation.navigate('WornOutfits')}
             >
               <LinearGradient
                 colors={['#a8edea', '#fed6e3']}
@@ -480,13 +491,13 @@ const HomeScreen = ({ navigation }) => {
               >
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
-                    <Text style={[styles.featureTitle, { color: '#2D3436' }]}>Style History</Text>
+                    <Text style={[styles.featureTitle, { color: '#2D3436' }]}>Worn Outfits</Text>
                     <Text style={[styles.featureSubtitle, { color: '#636E72' }]}>
-                      Track your outfits and style journey
+                      View your outfit history with dates
                     </Text>
                     <View style={[styles.featureButton, { backgroundColor: '#2D3436' }]}>
                       <Text style={styles.featureButtonText}>View History</Text>
-                      <Ionicons name="time" size={16} color="#fff" />
+                      <Ionicons name="checkmark-circle" size={16} color="#fff" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>

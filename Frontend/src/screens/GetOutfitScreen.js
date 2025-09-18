@@ -317,29 +317,27 @@ const handleLikeOutfit = async () => {
       }
 
       // Format outfit data for storage
-      const outfitData = {
-        items: currentOutfit.items,
-        occasion: occasion,
-        confidence: currentOutfit.confidence,
-        reason: currentOutfit.reason
-      };
+      const outfitData = outfitHistoryService.formatOutfitForStorage(
+        currentOutfit.items,
+        occasion,
+        currentOutfit.confidence
+      );
 
-      // Record the worn outfit using the backend API
-      const result = await apiService.post('/api/outfit/wear', {
-        outfit_data: outfitData,
-        user_id: 1,
-        occasion: occasion,
-        weather: weatherInfo?.condition || mockWeatherData.condition,
-        location: location,
-        worn_date: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
-      });
+      // Record the worn outfit using the outfit history service
+      const result = await outfitHistoryService.recordWornOutfit(
+        outfitData,
+        occasion,
+        weatherInfo?.condition || mockWeatherData.condition,
+        location,
+        new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+      );
 
       if (result && result.status === 'success') {
         Alert.alert(
           'Outfit Recorded!',
           `This outfit has been saved to your history for today.`,
           [
-            { text: 'View History', onPress: () => navigation.navigate('OutfitHistory') },
+            { text: 'View History', onPress: () => navigation.navigate('WornOutfits') },
             { text: 'Generate New Outfit', onPress: generateOutfit },
             { text: 'OK', style: 'default' }
           ]

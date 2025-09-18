@@ -26,6 +26,10 @@ from pathlib import Path
 # Load environment variables
 load_dotenv()
 
+# Configure static directory
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -86,11 +90,6 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
-
-# Mount static files for images
-static_dir = Path(__file__).parent / "static"
-static_dir.mkdir(exist_ok=True)
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -1053,6 +1052,13 @@ async def get_outfit_history(user_id: int = 1, limit: int = 50, start_date: str 
             end_date=end_date
         )
         
+        # Debug logging
+        if result.get('history'):
+            logger.info(f"Returning {len(result['history'])} outfit history entries")
+            for i, entry in enumerate(result['history'][:2]):  # Log first 2 entries
+                logger.info(f"Entry {i}: outfit_data type = {type(entry.get('outfit_data'))}")
+                logger.info(f"Entry {i}: outfit_data = {entry.get('outfit_data')}")
+        
         return result
         
     except HTTPException:
@@ -1593,5 +1599,14 @@ async def add_sample_wardrobe():
             "status": "error", 
             "message": str(e)
         }
+
+# Mount static files for images - this should be done after all routes are defined
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# Mount images directory for direct access
+images_dir = static_dir / "images"
+images_dir.mkdir(exist_ok=True)
+app.mount("/images", StaticFiles(directory=images_dir), name="images")
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

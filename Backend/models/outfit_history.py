@@ -66,7 +66,12 @@ class OutfitHistory:
         """Save a worn outfit to history"""
         if not worn_date:
             worn_date = datetime.now().date()
+            
+        # Convert Python dict to JSON string for database storage
+        import json
+        outfit_data_json = json.dumps(outfit_data)
         
+        # Use insert with weather and location
         insert_query = """
         INSERT INTO outfit_history 
         (user_id, worn_date, outfit_data, occasion, weather, location)
@@ -74,10 +79,11 @@ class OutfitHistory:
         RETURNING id;
         """
         
+        cursor = None
         try:
             cursor = self.db.cursor()
             cursor.execute(insert_query, (
-                user_id, worn_date, outfit_data, occasion, weather, location
+                user_id, worn_date, outfit_data_json, occasion, weather, location
             ))
             outfit_id = cursor.fetchone()[0]
             self.db.commit()
@@ -85,7 +91,12 @@ class OutfitHistory:
             return outfit_id
         except Exception as e:
             print(f"Error saving worn outfit: {e}")
-            self.db.rollback()
+            if cursor:
+                cursor.close()
+            try:
+                self.db.rollback()
+            except:
+                pass
             raise e
     
     def get_outfit_history(self, user_id: int, limit: int = 50, 
@@ -93,8 +104,8 @@ class OutfitHistory:
                           end_date: datetime = None) -> List[Dict[str, Any]]:
         """Get user's outfit history"""
         query = """
-        SELECT id, worn_date, outfit_data, occasion, weather, location, 
-               rating, notes, created_at
+        SELECT id, worn_date, outfit_data, occasion, 
+               rating, notes, created_at, weather, location
         FROM outfit_history 
         WHERE user_id = %s
         """
@@ -119,16 +130,26 @@ class OutfitHistory:
             
             history = []
             for row in results:
+                # Parse outfit_data JSON if it's a string
+                outfit_data = row[2]
+                if isinstance(outfit_data, str):
+                    try:
+                        import json
+                        outfit_data = json.loads(outfit_data)
+                    except json.JSONDecodeError:
+                        print(f"Failed to parse outfit_data JSON: {outfit_data}")
+                        outfit_data = {}
+                
                 history.append({
                     'id': row[0],
                     'worn_date': row[1].isoformat() if row[1] else None,
-                    'outfit_data': row[2],
+                    'outfit_data': outfit_data,
                     'occasion': row[3],
-                    'weather': row[4],
-                    'location': row[5],
-                    'rating': row[6],
-                    'notes': row[7],
-                    'created_at': row[8].isoformat() if row[8] else None
+                    'rating': row[4],
+                    'notes': row[5],
+                    'created_at': row[6].isoformat() if row[6] else None,
+                    'weather': row[7],
+                    'location': row[8]
                 })
             
             return history
@@ -139,7 +160,7 @@ class OutfitHistory:
     def get_outfit_by_date(self, user_id: int, date: datetime) -> Dict[str, Any]:
         """Get outfit worn on a specific date"""
         query = """
-        SELECT id, outfit_data, occasion, weather, location, rating, notes
+        SELECT id, outfit_data, occasion, rating, notes, weather, location
         FROM outfit_history 
         WHERE user_id = %s AND worn_date = %s
         ORDER BY created_at DESC
@@ -153,18 +174,33 @@ class OutfitHistory:
             cursor.close()
             
             if result:
+                # Parse outfit_data JSON if it's a string
+                outfit_data = result[1]
+                if isinstance(outfit_data, str):
+                    try:
+                        import json
+                        outfit_data = json.loads(outfit_data)
+                    except json.JSONDecodeError:
+                        print(f"Failed to parse outfit_data JSON: {outfit_data}")
+                        outfit_data = {}
+                
                 return {
                     'id': result[0],
-                    'outfit_data': result[1],
+                    'outfit_data': outfit_data,
                     'occasion': result[2],
-                    'weather': result[3],
-                    'location': result[4],
-                    'rating': result[5],
-                    'notes': result[6]
+                    'rating': result[3],
+                    'notes': result[4],
+                    'weather': result[5],
+                    'location': result[6]
                 }
             return None
         except Exception as e:
             print(f"Error fetching outfit by date: {e}")
+            # Rollback the transaction on error
+            try:
+                self.db.rollback()
+            except:
+                pass
             return None
     
     def update_outfit_rating(self, outfit_id: int, rating: int, notes: str = None) -> bool:
