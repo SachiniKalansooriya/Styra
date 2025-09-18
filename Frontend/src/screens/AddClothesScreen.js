@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../themes/ThemeProvider';
 import { cameraBackend } from '../utils/storage';
 import wardrobeService from '../services/wardrobeService';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const AddClothesScreen = ({ navigation, backendConnected }) => {
   const { theme } = useTheme();
@@ -344,18 +345,18 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
                 setCameraType(cameraType === 'back' ? 'front' : 'back');
               }}
             >
-              <Text style={styles.controlText}>🔄</Text>
+              <Icon name="flip-camera-ios" size={24} color="white" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.bottomControls}>
             <TouchableOpacity 
-              style={styles.galleryButton}
-              onPress={pickImageFromGallery}
-            >
-              <Text style={styles.controlText}>🖼️</Text>
-              <Text style={styles.controlLabel}>Gallery</Text>
-            </TouchableOpacity>
+  style={styles.galleryButton}
+  onPress={pickImageFromGallery}
+>
+  <Icon name="photo-library" size={24} color="white" />
+
+</TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.captureButton}
@@ -369,7 +370,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
               onPress={() => Alert.alert('Tips', 'For best results:\n• Good lighting\n• Plain background\n• Item laid flat\n• Fill the frame')}
             >
               <Text style={styles.controlText}>💡</Text>
-              <Text style={styles.controlLabel}>Tips</Text>
+    
             </TouchableOpacity>
           </View>
         </View>

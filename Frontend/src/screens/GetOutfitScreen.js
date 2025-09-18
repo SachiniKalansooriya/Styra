@@ -579,40 +579,44 @@ const handleLikeOutfit = async () => {
       </ScrollView>
 
       {!loading && currentOutfit && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={styles.dislikeButton} 
-            onPress={handleDislikeOutfit}
-          >
-            <Ionicons name="thumbs-down" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Try Again</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.favoriteButton} 
-            onPress={handleSaveFavorite}
-          >
-            <Ionicons name="heart-outline" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Favorite</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.likeButton} 
-            onPress={handleLikeOutfit}
-          >
-            <Ionicons name="heart" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Save</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.wearButton} 
-            onPress={handleWearOutfit}
-          >
-            <Ionicons name="checkmark" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Wear This</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+  <View style={styles.actionButtons}>
+    <View style={styles.buttonRow}>
+      <TouchableOpacity 
+        style={styles.dislikeButton} 
+        onPress={handleDislikeOutfit}
+      >
+        <Ionicons name="thumbs-down" size={20} color="#fff" />
+        <Text style={styles.buttonText}>Try Again</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.favoriteButton} 
+        onPress={handleSaveFavorite}
+      >
+        <Ionicons name="heart-outline" size={20} color="#fff" />
+        <Text style={styles.buttonText}>Favorite</Text>
+      </TouchableOpacity>
+    </View>
+    
+    <View style={styles.buttonRow}>
+      <TouchableOpacity 
+        style={styles.likeButton} 
+        onPress={handleLikeOutfit}
+      >
+        <Ionicons name="heart" size={20} color="#fff" />
+        <Text style={styles.buttonText}>Save</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.wearButton} 
+        onPress={handleWearOutfit}
+      >
+        <Ionicons name="checkmark" size={20} color="#fff" />
+        <Text style={styles.buttonText}>Wear This</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
     </SafeAreaView>
   );
 };
@@ -804,52 +808,55 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionButtons: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  dislikeButton: {
-    flex: 1,
-    backgroundColor: '#666',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginRight: 5,
-  },
-  favoriteButton: {
-    flex: 1,
-    backgroundColor: '#9b59b6',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginRight: 5,
-  },
-  likeButton: {
-    flex: 1,
-    backgroundColor: '#e74c3c',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginHorizontal: 5,
-  },
-  wearButton: {
-    flex: 1,
-    backgroundColor: '#27ae60',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginLeft: 5,
-  },
+  paddingHorizontal: 20,
+  paddingVertical: 15,
+  borderTopWidth: 1,
+  borderTopColor: '#f0f0f0',
+},
+buttonRow: {
+  flexDirection: 'row',
+  marginBottom: 10,
+},
+dislikeButton: {
+  flex: 1,
+  backgroundColor: '#666',
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: 12,
+  borderRadius: 8,
+  marginRight: 5,
+},
+favoriteButton: {
+  flex: 1,
+  backgroundColor: '#9b59b6',
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: 12,
+  borderRadius: 8,
+  marginLeft: 5,
+},
+likeButton: {
+  flex: 1,
+  backgroundColor: '#e74c3c',
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: 12,
+  borderRadius: 8,
+  marginRight: 5,
+},
+wearButton: {
+  flex: 1,
+  backgroundColor: '#27ae60',
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: 12,
+  borderRadius: 8,
+  marginLeft: 5,
+},
   buttonText: {
     color: '#fff',
     fontSize: 14,

@@ -12,11 +12,14 @@ import TripPlannerScreen from '../screens/TripPlannerScreen';
 import GetOutfitScreen from '../screens/GetOutfitScreen';
 import PackingListResultsScreen from '../screens/PackingListResultsScreen';
 import OutfitHistoryScreen from '../screens/OutfitHistoryScreen';
+// Import with explicit naming
 import FavoriteOutfitsScreen from '../screens/FavoriteOutfitsScreen';
 
 const Stack = createStackNavigator();
 
 export const AppNavigator = () => {
+  console.log('AppNavigator initialized');
+  
   return (
     <NavigationContainer>
       <Stack.Navigator 
@@ -51,7 +54,11 @@ export const AppNavigator = () => {
         <Stack.Screen name="GetOutfit" component={GetOutfitScreen} />
         <Stack.Screen name="PackingListResults" component={PackingListResultsScreen} />
         <Stack.Screen name="OutfitHistory" component={OutfitHistoryScreen} />
-        <Stack.Screen name="FavoriteOutfits" component={FavoriteOutfitsScreen} />
+        <Stack.Screen 
+          name="FavoriteOutfits" 
+          component={FavoriteOutfitsScreen} 
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

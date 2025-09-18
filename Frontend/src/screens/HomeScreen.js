@@ -278,7 +278,10 @@ const HomeScreen = ({ navigation }) => {
       subtitle: 'Saved outfits',
       icon: 'heart',
       color: '#9b59b6',
-      onPress: () => navigation.navigate('FavoriteOutfits')
+      onPress: () => {
+        console.log('Navigating to FavoriteOutfits screen');
+        navigation.navigate('FavoriteOutfits');
+      }
     }
   ];
 

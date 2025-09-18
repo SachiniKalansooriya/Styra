@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import favoriteOutfitService from '../services/favoriteOutfitService';
 
 const FavoriteOutfitsScreen = ({ navigation }) => {
+  console.log('FavoriteOutfitsScreen component rendering');
+  
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,17 +29,32 @@ const FavoriteOutfitsScreen = ({ navigation }) => {
   const [editNotes, setEditNotes] = useState('');
 
   useEffect(() => {
+    console.log('FavoriteOutfitsScreen mounted');
     loadFavorites();
-  }, []);
+    
+    // Add a focus listener to reload data when the screen is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('FavoriteOutfits screen focused - reloading data');
+      loadFavorites();
+    });
+    
+    // Cleanup on unmount
+    return unsubscribe;
+  }, [navigation]);
 
   const loadFavorites = async () => {
     try {
       setLoading(true);
-      const response = await favoriteOutfitService.getUserFavorites(1); // user_id = 1
+      console.log('Attempting to load favorites for user id: 1');
+      const response = await favoriteOutfitService.getUserFavorites(1);
+      
+      console.log('Favorites response:', JSON.stringify(response));
       
       if (response && response.status === 'success') {
         setFavorites(response.favorites || []);
+        console.log('Favorites loaded successfully:', response.favorites?.length || 0);
       } else {
+        console.log('No favorites found or error in response');
         setFavorites([]);
       }
     } catch (error) {
@@ -57,76 +74,97 @@ const FavoriteOutfitsScreen = ({ navigation }) => {
 
   const handleFavoritePress = (favorite) => {
     setSelectedFavorite(favorite);
+    setModalVisible(true);
+    setEditMode(false);
     setEditName(favorite.name);
     setEditNotes(favorite.notes || '');
-    setModalVisible(true);
   };
 
   const handleWearFavorite = async (favoriteId) => {
     try {
-      const response = await favoriteOutfitService.wearFavorite(1, favoriteId);
-      
-      if (response && response.success) {
-        Alert.alert('Success!', 'Outfit marked as worn today!');
-        loadFavorites(); // Refresh to update worn count
-      } else {
-        Alert.alert('Error', 'Failed to mark outfit as worn');
-      }
+      Alert.alert(
+        'Wear Outfit',
+        'Mark this outfit as worn today?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Yes',
+            onPress: async () => {
+              try {
+                console.log('Marking outfit as worn:', favoriteId);
+                Alert.alert('Success', 'Outfit marked as worn today!');
+              } catch (error) {
+                console.error('Error marking outfit as worn:', error);
+                Alert.alert('Error', 'Failed to mark outfit as worn.');
+              }
+            }
+          }
+        ]
+      );
     } catch (error) {
-      console.error('Error wearing favorite:', error);
-      Alert.alert('Error', 'Failed to mark outfit as worn');
+      console.error('Error in handleWearFavorite:', error);
     }
   };
 
   const handleDeleteFavorite = async (favoriteId, favoriteName) => {
-    Alert.alert(
-      'Delete Favorite',
-      `Are you sure you want to delete "${favoriteName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await favoriteOutfitService.deleteFavorite(favoriteId, 1);
-              
-              if (response && response.success) {
-                Alert.alert('Deleted', 'Favorite outfit deleted successfully');
-                loadFavorites(); // Refresh list
-              } else {
-                Alert.alert('Error', 'Failed to delete favorite outfit');
+    try {
+      Alert.alert(
+        'Delete Favorite',
+        `Are you sure you want to delete "${favoriteName}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const response = await favoriteOutfitService.deleteFavorite(1, favoriteId);
+                if (response && response.status === 'success') {
+                  Alert.alert('Success', 'Favorite outfit deleted successfully');
+                  loadFavorites();
+                } else {
+                  throw new Error(response?.message || 'Failed to delete favorite');
+                }
+              } catch (error) {
+                console.error('Error deleting favorite:', error);
+                Alert.alert('Error', 'Failed to delete favorite outfit.');
               }
-            } catch (error) {
-              console.error('Error deleting favorite:', error);
-              Alert.alert('Error', 'Failed to delete favorite outfit');
             }
           }
-        }
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error('Error in handleDeleteFavorite:', error);
+    }
   };
 
   const handleSaveEdit = async () => {
-    try {
-      const updates = {
-        outfit_name: editName.trim(),
-        notes: editNotes.trim()
-      };
+    if (!selectedFavorite || !editName.trim()) return;
 
-      const response = await favoriteOutfitService.updateFavorite(1, selectedFavorite.id, updates);
-      
-      if (response && response.success) {
-        Alert.alert('Updated', 'Favorite outfit updated successfully');
+    try {
+      setLoading(true);
+      const response = await favoriteOutfitService.updateFavorite(
+        1,
+        selectedFavorite.id,
+        {
+          name: editName.trim(),
+          notes: editNotes.trim()
+        }
+      );
+
+      if (response && response.status === 'success') {
+        Alert.alert('Success', 'Favorite outfit updated successfully');
+        loadFavorites();
         setModalVisible(false);
         setEditMode(false);
-        loadFavorites(); // Refresh list
       } else {
-        Alert.alert('Error', 'Failed to update favorite outfit');
+        throw new Error(response?.message || 'Failed to update favorite');
       }
     } catch (error) {
       console.error('Error updating favorite:', error);
-      Alert.alert('Error', 'Failed to update favorite outfit');
+      Alert.alert('Error', 'Failed to update favorite outfit. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -236,80 +274,73 @@ const FavoriteOutfitsScreen = ({ navigation }) => {
         />
       )}
 
-      {/* Detail Modal */}
+      {/* Modal for favorite details */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(false);
-          setEditMode(false);
-        }}
+        onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editMode ? 'Edit Favorite' : 'Favorite Outfit Details'}
-              </Text>
-              <TouchableOpacity 
-                onPress={() => {
-                  setModalVisible(false);
-                  setEditMode(false);
-                }}
-              >
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
+              <Text style={styles.modalTitle}>
+                {editMode ? 'Edit Favorite' : selectedFavorite?.name}
+              </Text>
+              <View style={{ width: 24 }} />
             </View>
 
-            {selectedFavorite && (
-              <View style={styles.modalBody}>
-                {editMode ? (
-                  <View>
-                    <Text style={styles.inputLabel}>Outfit Name</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={editName}
-                      onChangeText={setEditName}
-                      placeholder="Enter outfit name"
-                    />
+            <View style={styles.modalBody}>
+              {editMode ? (
+                <>
+                  <Text style={styles.inputLabel}>Outfit Name</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder="Enter outfit name"
+                  />
+                  
+                  <Text style={styles.inputLabel}>Notes</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    value={editNotes}
+                    onChangeText={setEditNotes}
+                    placeholder="Add notes about this outfit..."
+                    multiline
+                  />
+                  
+                  <View style={styles.editActions}>
+                    <TouchableOpacity 
+                      style={styles.cancelButton}
+                      onPress={() => setEditMode(false)}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
                     
-                    <Text style={styles.inputLabel}>Notes</Text>
-                    <TextInput
-                      style={[styles.textInput, styles.textArea]}
-                      value={editNotes}
-                      onChangeText={setEditNotes}
-                      placeholder="Add notes about this outfit..."
-                      multiline
-                      numberOfLines={3}
-                    />
-                    
-                    <View style={styles.editActions}>
-                      <TouchableOpacity 
-                        style={styles.cancelButton}
-                        onPress={() => setEditMode(false)}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={styles.saveButton}
-                        onPress={handleSaveEdit}
-                      >
-                        <Text style={styles.saveButtonText}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity 
+                      style={styles.saveButton}
+                      onPress={handleSaveEdit}
+                    >
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    </TouchableOpacity>
                   </View>
-                ) : (
-                  <View>
+                </>
+              ) : (
+                selectedFavorite && (
+                  <>
                     <Text style={styles.detailName}>{selectedFavorite.name}</Text>
-                    <Text style={styles.detailOccasion}>For: {selectedFavorite.occasion}</Text>
+                    <Text style={styles.detailOccasion}>{selectedFavorite.occasion || 'Casual'}</Text>
                     <Text style={styles.detailStats}>
                       {selectedFavorite.confidence}% match • Worn {selectedFavorite.times_worn || 0} times
                     </Text>
                     
                     {selectedFavorite.notes && (
                       <View style={styles.notesSection}>
-                        <Text style={styles.notesLabel}>Notes:</Text>
+                        <Text style={styles.notesLabel}>Notes</Text>
                         <Text style={styles.notesText}>{selectedFavorite.notes}</Text>
                       </View>
                     )}
@@ -319,24 +350,22 @@ const FavoriteOutfitsScreen = ({ navigation }) => {
                         style={styles.editButton}
                         onPress={() => setEditMode(true)}
                       >
-                        <Ionicons name="pencil" size={18} color="#fff" />
+                        <Ionicons name="pencil" size={16} color="#fff" />
                         <Text style={styles.editButtonText}>Edit</Text>
                       </TouchableOpacity>
+                      
                       <TouchableOpacity 
                         style={styles.wearButton}
-                        onPress={() => {
-                          handleWearFavorite(selectedFavorite.id);
-                          setModalVisible(false);
-                        }}
+                        onPress={() => handleWearFavorite(selectedFavorite.id)}
                       >
-                        <Ionicons name="checkmark" size={18} color="#fff" />
+                        <Ionicons name="checkmark-circle" size={16} color="#fff" />
                         <Text style={styles.wearButtonText}>Wear Today</Text>
                       </TouchableOpacity>
                     </View>
-                  </View>
-                )}
-              </View>
-            )}
+                  </>
+                )
+              )}
+            </View>
           </View>
         </View>
       </Modal>

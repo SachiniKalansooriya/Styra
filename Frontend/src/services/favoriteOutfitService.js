@@ -21,6 +21,7 @@ class FavoriteOutfitService {
   // Get all favorite outfits for a user
   async getUserFavorites(userId) {
     try {
+      console.log(`Getting favorites for user ${userId}`);
       const response = await apiService.get(`/api/outfit/favorites/${userId}`);
       return response;
     } catch (error) {
