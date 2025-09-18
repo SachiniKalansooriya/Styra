@@ -382,6 +382,10 @@ class FreeAIClothingAnalyzer:
         elif any(word in description_lower for word in ['casual', 'everyday', 't-shirt', 'jeans', 'comfortable']):
             occasion_scores['casual'] = occasion_scores.get('casual', 0) + 6
         
+        # Specific datenight items boost
+        if any(word in description_lower for word in ['dress', 'frock', 'denim', 'cute', 'nice top', 'crop top']):
+            occasion_scores['datenight'] = occasion_scores.get('datenight', 0) + 5
+        
         # Color and style hints for occasions
         if any(word in description_lower for word in ['red', 'black dress', 'elegant', 'stylish']):
             occasion_scores['datenight'] = occasion_scores.get('datenight', 0) + 3
@@ -668,7 +672,7 @@ class FreeAIClothingAnalyzer:
             'sportswear': 'athletic',
             'tops': 'casual',
             'bottoms': 'casual',
-            'dresses': 'formal',
+            'dresses': 'datenight',  # Changed from 'formal' to be more flexible for datenight
             'outerwear': 'casual',
             'accessories': None,
             'shoes': None,

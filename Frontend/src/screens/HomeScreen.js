@@ -242,52 +242,6 @@ const HomeScreen = ({ navigation, onLogout }) => {
     }
   };
 
-  const getCityNameFromCoordinates = (lat, lon) => {
-    // Define Sri Lankan cities with their approximate coordinates and smaller radius for accuracy
-    const cities = [
-      { name: 'Galle', lat: 6.0535, lon: 80.2210, radius: 0.05 }, // ~5.5km radius
-      { name: 'Colombo', lat: 6.9271, lon: 79.8612, radius: 0.08 }, // Larger radius for metro area
-      { name: 'Kandy', lat: 7.2966, lon: 80.6350, radius: 0.05 },
-      { name: 'Jaffna', lat: 9.6615, lon: 80.0255, radius: 0.05 },
-      { name: 'Negombo', lat: 7.2084, lon: 79.8380, radius: 0.04 },
-      { name: 'Matara', lat: 5.9549, lon: 80.5550, radius: 0.04 },
-      { name: 'Batticaloa', lat: 7.7102, lon: 81.6924, radius: 0.05 },
-      { name: 'Trincomalee', lat: 8.5874, lon: 81.2152, radius: 0.05 },
-      { name: 'Anuradhapura', lat: 8.3114, lon: 80.4037, radius: 0.05 },
-      { name: 'Polonnaruwa', lat: 7.9403, lon: 81.0188, radius: 0.05 },
-      { name: 'Ratnapura', lat: 6.6828, lon: 80.4034, radius: 0.05 },
-      { name: 'Badulla', lat: 6.9934, lon: 81.0550, radius: 0.05 },
-      { name: 'Kurunegala', lat: 7.4818, lon: 80.3609, radius: 0.05 },
-      // Add more suburbs/towns around Galle for better detection
-      { name: 'Unawatuna', lat: 6.0100, lon: 80.2500, radius: 0.02 },
-      { name: 'Hikkaduwa', lat: 6.1410, lon: 80.1019, radius: 0.02 },
-      { name: 'Bentota', lat: 6.4200, lon: 79.9956, radius: 0.02 },
-      { name: 'Mirissa', lat: 5.9486, lon: 80.4572, radius: 0.02 },
-      { name: 'Weligama', lat: 5.9748, lon: 80.4295, radius: 0.02 },
-    ];
-
-    // Sort by distance and return the closest city within radius
-    const cityDistances = cities.map(city => ({
-      ...city,
-      distance: Math.sqrt(
-        Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2)
-      )
-    }));
-
-    // Sort by distance (closest first)
-    cityDistances.sort((a, b) => a.distance - b.distance);
-
-    // Return the closest city if it's within its radius
-    const closestCity = cityDistances[0];
-    if (closestCity && closestCity.distance <= closestCity.radius) {
-      console.log(`Detected city: ${closestCity.name} (distance: ${(closestCity.distance * 111).toFixed(1)}km)`);
-      return closestCity.name;
-    }
-
-    console.log('No city detected within radius, closest was:', closestCity?.name, 'at', (closestCity?.distance * 111).toFixed(1), 'km');
-    return null;
-  };
-
   const getAccurateCityName = async (latitude, longitude) => {
     try {
       console.log('Getting accurate city name for coordinates:', latitude, longitude);

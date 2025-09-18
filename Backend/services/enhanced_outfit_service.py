@@ -117,10 +117,10 @@ class EnhancedOutfitService:
                     'avoid_items': ['workout', 'athletic', 'gym clothes']
                 },
                 'datenight': {
-                    'preferred_categories': ['tops', 'bottoms', 'shoes', 'accessories'],
-                    'preferred_items': ['dress', 'nice top', 'blouse', 'nice pants', 'dress shoes'],
-                    'color_preferences': ['red', 'black', 'blue', 'white', 'pink'],
-                    'avoid_items': ['workout', 'athletic', 'gym clothes']
+                    'preferred_categories': ['dresses', 'tops', 'bottoms', 'shoes', 'accessories'],
+                    'preferred_items': ['dress', 'frock', 'nice top', 'blouse', 'crop top', 'denim', 'jeans', 'cute pants', 'heels', 'flats', 'boots'],
+                    'color_preferences': ['red', 'black', 'blue', 'white', 'pink', 'burgundy', 'navy'],
+                    'avoid_items': ['workout', 'athletic', 'gym clothes', 'office trousers', 'formal pants', 'dress pants', 'blazer', 'business shirt']
                 }
             },
             'category_combinations': {
@@ -220,6 +220,13 @@ class EnhancedOutfitService:
             'polo': 6, 'chinos': 6, 'loafers': 6, 'cardigan': 6
         }
         
+        # Datenight appropriate items (mid-formal range)
+        datenight_keywords = {
+            'dress': 6, 'frock': 6, 'nice dress': 7, 'party dress': 6,
+            'denim': 5, 'jeans': 5, 'cute top': 5, 'nice top': 6,
+            'crop top': 4, 'heels': 7, 'boots': 5, 'flats': 5
+        }
+        
         casual_keywords = {
             't-shirt': 2, 'tank top': 1, 'hoodie': 2, 'sweatshirt': 2,
             'shorts': 2, 'athletic': 1, 'gym': 1, 'workout': 1, 'sport': 1,
@@ -240,6 +247,15 @@ class EnhancedOutfitService:
         if max_formal_score > 0:
             return max_formal_score
         
+        # Check for datenight appropriate items
+        max_datenight_score = 0
+        for keyword, score in datenight_keywords.items():
+            if keyword in combined_text:
+                max_datenight_score = max(max_datenight_score, score)
+        
+        if max_datenight_score > 0:
+            return max_datenight_score
+        
         # Check for casual keywords
         min_casual_score = 10
         for keyword, score in casual_keywords.items():
@@ -252,7 +268,8 @@ class EnhancedOutfitService:
         # Category-based defaults if no keywords match
         category_defaults = {
             'formal': 8,
-            'dress': 7,
+            'dress': 6,  # Updated for datenight compatibility
+            'dresses': 6,  # Updated for datenight compatibility
             'tops': 5,
             'bottoms': 5,
             'shoes': 5,
