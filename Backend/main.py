@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -20,6 +20,11 @@ from services.favorite_outfit_service import favorite_outfit_service
 from services.weather_service import weather_service
 from services.trip_service import trip_service
 from services.buy_recommendation_service import BuyRecommendationService
+from database.connection import DatabaseConnection
+from app.database.database import get_db, create_tables
+from app.models.user import User
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
 from datetime import datetime
 import json
 import glob
@@ -37,6 +42,20 @@ static_dir.mkdir(exist_ok=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Initialize database connection
+db = DatabaseConnection()
+
+# Initialize password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt"""
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return pwd_context.verify(plain_password, hashed_password)
+
 # Initialize services
 trip_ai_service = None
 outfit_history_service = None
@@ -48,6 +67,10 @@ async def lifespan(app: FastAPI):
     global trip_ai_service, outfit_history_service
     
     try:
+        # Create database tables
+        create_tables()
+        logger.info("Database tables created/verified")
+        
         # Test the image analysis service
         service_status = image_analysis_service.get_service_info()
         logger.info(f"Image analysis service initialized: {service_status}")
@@ -220,8 +243,8 @@ async def health_check():
 
 # Authentication Routes
 @app.post("/auth/login")
-async def login(credentials: dict):
-    """User login endpoint"""
+async def login(credentials: dict, db_session: Session = Depends(get_db)):
+    """Enhanced user login endpoint"""
     try:
         email = credentials.get("email")
         password = credentials.get("password")
@@ -229,42 +252,106 @@ async def login(credentials: dict):
         if not email or not password:
             raise HTTPException(status_code=400, detail="Email and password required")
         
+        # Basic email format validation
+        import re
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_pattern, email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
+        # Find user by email
+        user = db_session.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Verify password
+        if not verify_password(password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Check if user is active
+        if not user.is_active:
+            raise HTTPException(status_code=401, detail="Account is deactivated")
+        
+        logger.info(f"Successful login for user: {user.email}")
+        
         return {
             "status": "success",
             "message": "Login successful",
             "user": {
-                "id": 1,
-                "email": email,
-                "name": "User"
+                "id": user.id,
+                "email": user.email,
+                "name": user.full_name,
+                "username": user.username
             },
-            "token": "mock_token_123"
+            "token": f"token_{user.id}"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Login error: {e}")
+        db_session.rollback()
         raise HTTPException(status_code=500, detail="Login failed")
 
 @app.post("/auth/signup")
-async def signup(user_data: dict):
-    """User signup endpoint"""
+async def signup(user_data: dict, db_session: Session = Depends(get_db)):
+    """Enhanced user signup endpoint"""
     try:
         email = user_data.get("email")
         password = user_data.get("password")
         name = user_data.get("name")
         
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password required")
+        # Validation
+        if not email or not password or not name:
+            raise HTTPException(status_code=400, detail="Name, email and password are required")
+        
+        if len(password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        if len(name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Name must be at least 2 characters")
+        
+        # Basic email format validation
+        import re
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_pattern, email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
+        # Check if user already exists
+        existing_user = db_session.query(User).filter(User.email == email).first()
+        if existing_user:
+            raise HTTPException(status_code=409, detail="User with this email already exists")
+        
+        # Create new user
+        hashed_password = hash_password(password)
+        new_user = User(
+            email=email,
+            username=name,  # Use the full name as username
+            hashed_password=hashed_password,
+            full_name=name,
+            is_active=True
+        )
+        
+        db_session.add(new_user)
+        db_session.commit()
+        db_session.refresh(new_user)
+        
+        logger.info(f"User created successfully: {name} <{email}>")
         
         return {
             "status": "success",
             "message": "Account created successfully",
             "user": {
-                "id": 2,
-                "email": email,
-                "name": name or "New User"
-            }
+                "id": new_user.id,  # Now this will be an integer
+                "email": new_user.email,
+                "name": new_user.full_name,
+                "username": new_user.username
+            },
+            "token": f"token_{new_user.id}"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Signup error: {e}")
+        db_session.rollback()
         raise HTTPException(status_code=500, detail="Signup failed")
 
 # Wardrobe Routes
@@ -675,20 +762,86 @@ async def get_multiple_outfit_recommendations(request_data: dict):
     try:
         user_id = request_data.get('user_id', 1)
         location = request_data.get('location', {})
-        occasions = request_data.get('occasions', ['casual', 'business', 'date'])
+        occasions = request_data.get('occasions', ['casual', 'work', 'formal', 'workout', 'datenight'])
+        demo_weather = request_data.get('demo_weather')
         
-        # Create weather data
-        weather_data = {
-            'temperature': 22,
-            'condition': 'partly cloudy',
-            'humidity': 55,
-            'windSpeed': 12,
-            'precipitation': 0
+        # Check if demo weather is provided
+        if demo_weather:
+            weather_data = {
+                'temperature': demo_weather.get('temperature', 25),
+                'condition': demo_weather.get('condition', 'sunny'),
+                'humidity': demo_weather.get('humidity', 60),
+                'windSpeed': demo_weather.get('windSpeed', 10),
+                'precipitation': demo_weather.get('precipitation', 0),
+                'location': demo_weather.get('location', 'Demo Location')
+            }
+        else:
+            # Create default weather data
+            weather_data = {
+                'temperature': 22,
+                'condition': 'partly cloudy',
+                'humidity': 55,
+                'windSpeed': 12,
+                'precipitation': 0
+            }
+        
+        # Use the enhanced multi-occasion service
+        result = enhanced_outfit_service.generate_multi_occasion_recommendations(
+            user_id=user_id,
+            weather_data=weather_data
+        )
+        
+        if result.get('error'):
+            return {
+                "status": "error",
+                "message": result['message'],
+                "recommendations": {}
+            }
+        
+        return {
+            "status": "success",
+            "recommendations": result['recommendations'],
+            "wardrobe_analysis": result['wardrobe_analysis'],
+            "weather": weather_data,
+            "message": f"Generated outfit recommendations for all occasions"
         }
         
+    except Exception as e:
+        logger.error(f"Multiple recommendations error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate multiple recommendations")
+
+@app.post("/api/outfit/enhanced-recommendations")
+async def get_enhanced_outfit_recommendations(request_data: dict):
+    """Generate enhanced AI outfit recommendations with detailed analysis"""
+    try:
+        user_id = request_data.get('user_id', 1)
+        location = request_data.get('location', {})
+        occasions = request_data.get('occasions', ['casual', 'work', 'formal', 'workout', 'datenight'])
+        demo_weather = request_data.get('demo_weather')
+        
+        # Check if demo weather is provided
+        if demo_weather:
+            weather_data = {
+                'temperature': demo_weather.get('temperature', 25),
+                'condition': demo_weather.get('condition', 'sunny'),
+                'humidity': demo_weather.get('humidity', 60),
+                'windSpeed': demo_weather.get('windSpeed', 10),
+                'precipitation': demo_weather.get('precipitation', 0),
+                'location': demo_weather.get('location', 'Demo Location')
+            }
+        else:
+            # Try to get real weather data
+            weather_data = {
+                'temperature': 22,
+                'condition': 'partly cloudy',
+                'humidity': 55,
+                'windSpeed': 12,
+                'precipitation': 0
+            }
+        
+        # Generate recommendations for all occasions
         recommendations = {}
         
-        # Generate recommendations for each occasion
         for occasion in occasions:
             try:
                 outfit = enhanced_outfit_service.generate_outfit_recommendation(
@@ -701,19 +854,27 @@ async def get_multiple_outfit_recommendations(request_data: dict):
                 logger.warning(f"Failed to generate {occasion} outfit: {e}")
                 recommendations[occasion] = {
                     'error': f'Failed to generate {occasion} outfit',
-                    'message': str(e)
+                    'message': str(e),
+                    'items': [],
+                    'confidence': 0
                 }
+        
+        # Get wardrobe analysis
+        wardrobe_items = enhanced_outfit_service.get_user_wardrobe_items(user_id)
+        analysis = enhanced_outfit_service._analyze_wardrobe_for_occasions(wardrobe_items, recommendations)
         
         return {
             "status": "success",
             "recommendations": recommendations,
+            "wardrobe_analysis": analysis,
             "weather": weather_data,
-            "message": f"Generated {len(recommendations)} outfit recommendations"
+            "total_items": len(wardrobe_items),
+            "message": f"Generated {len(recommendations)} enhanced outfit recommendations"
         }
         
     except Exception as e:
-        logger.error(f"Multiple recommendations error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate multiple recommendations")
+        logger.error(f"Enhanced recommendations error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate enhanced recommendations")
 
 # Trip Planner Routes - Enhanced with AI Service
 @app.post("/api/trip-planner/enhanced-packing")

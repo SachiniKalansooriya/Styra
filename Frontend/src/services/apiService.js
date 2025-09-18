@@ -10,7 +10,6 @@ class ApiService {
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
-      timeout: this.timeout,
       headers: {
         ...API_CONFIG.HEADERS,
         ...options.headers,
@@ -18,16 +17,32 @@ class ApiService {
       ...options,
     };
 
+    console.log('=== API REQUEST DEBUG ===');
+    console.log('URL:', url);
+    console.log('Config:', config);
+    console.log('Base URL:', this.baseURL);
+    console.log('========================');
+
     try {
       const response = await fetch(url, config);
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      console.log('Response data:', data);
+      return data;
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        url: url
+      });
       throw error;
     }
   }

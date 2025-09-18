@@ -124,17 +124,7 @@ const BuyRecommendationsScreen = ({ navigation }) => {
         </View>
       )}
 
-      <TouchableOpacity 
-        style={styles.shopButton}
-        onPress={() => Alert.alert('Shopping', `Looking for ${item.item_type}...`, [
-          { text: 'Online Stores', onPress: () => console.log('Navigate to online stores') },
-          { text: 'Local Stores', onPress: () => console.log('Navigate to local stores') },
-          { text: 'Cancel' }
-        ])}
-      >
-        <Text style={styles.shopButtonText}>Find Stores</Text>
-        <Ionicons name="storefront-outline" size={16} color="#fff" />
-      </TouchableOpacity>
+     8
     </View>
   );
 

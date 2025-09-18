@@ -68,14 +68,60 @@ class EnhancedOutfitService:
         }
     
     def _create_outfit_rules(self):
-        """Basic outfit combination rules"""
+        """Enhanced outfit combination rules with occasion-specific guidelines"""
         return {
             'occasion_formality': {
                 'casual': (1, 4),
+                'work': (5, 7),
                 'business': (5, 7),
                 'formal': (8, 10),
                 'workout': (1, 3),
-                'date': (6, 9)
+                'date': (6, 9),
+                'datenight': (6, 9)
+            },
+            'occasion_specific_rules': {
+                'casual': {
+                    'preferred_categories': ['tops', 'bottoms', 'shoes'],
+                    'preferred_items': ['t-shirt', 'jeans', 'sneakers', 'hoodie', 'shorts'],
+                    'color_preferences': ['blue', 'white', 'gray', 'black'],
+                    'avoid_items': ['suit', 'blazer', 'formal dress', 'heels']
+                },
+                'work': {
+                    'preferred_categories': ['tops', 'bottoms', 'shoes', 'outerwear'],
+                    'preferred_items': ['button shirt', 'blouse', 'dress pants', 'blazer', 'dress shoes'],
+                    'color_preferences': ['navy', 'black', 'white', 'gray', 'brown'],
+                    'avoid_items': ['tank top', 'shorts', 'sneakers', 'flip-flops']
+                },
+                'business': {
+                    'preferred_categories': ['tops', 'bottoms', 'shoes', 'outerwear'],
+                    'preferred_items': ['button shirt', 'blouse', 'dress pants', 'blazer', 'dress shoes'],
+                    'color_preferences': ['navy', 'black', 'white', 'gray', 'brown'],
+                    'avoid_items': ['tank top', 'shorts', 'sneakers', 'flip-flops']
+                },
+                'formal': {
+                    'preferred_categories': ['tops', 'bottoms', 'shoes', 'accessories'],
+                    'preferred_items': ['dress shirt', 'suit', 'dress', 'formal dress', 'dress shoes', 'heels'],
+                    'color_preferences': ['black', 'navy', 'white', 'gray'],
+                    'avoid_items': ['t-shirt', 'jeans', 'sneakers', 'shorts']
+                },
+                'workout': {
+                    'preferred_categories': ['tops', 'bottoms', 'shoes'],
+                    'preferred_items': ['athletic', 'gym', 'sports', 'workout', 'running', 'yoga'],
+                    'color_preferences': ['black', 'gray', 'blue', 'white'],
+                    'avoid_items': ['dress', 'suit', 'formal', 'heels']
+                },
+                'date': {
+                    'preferred_categories': ['tops', 'bottoms', 'shoes', 'accessories'],
+                    'preferred_items': ['dress', 'nice top', 'blouse', 'nice pants', 'dress shoes'],
+                    'color_preferences': ['red', 'black', 'blue', 'white', 'pink'],
+                    'avoid_items': ['workout', 'athletic', 'gym clothes']
+                },
+                'datenight': {
+                    'preferred_categories': ['tops', 'bottoms', 'shoes', 'accessories'],
+                    'preferred_items': ['dress', 'nice top', 'blouse', 'nice pants', 'dress shoes'],
+                    'color_preferences': ['red', 'black', 'blue', 'white', 'pink'],
+                    'avoid_items': ['workout', 'athletic', 'gym clothes']
+                }
             },
             'category_combinations': {
                 'required': ['tops', 'bottoms'],
@@ -83,7 +129,9 @@ class EnhancedOutfitService:
                 'avoid_combinations': [
                     ('tank_top', 'formal_pants'),
                     ('dress_shirt', 'athletic_shorts'),
-                    ('hoodie', 'dress_pants')
+                    ('hoodie', 'dress_pants'),
+                    ('workout_top', 'dress_pants'),
+                    ('formal_dress', 'sneakers')
                 ]
             }
         }
@@ -164,19 +212,60 @@ class EnhancedOutfitService:
         return base_range
     
     def _get_formality_score(self, category: str, name: str) -> int:
-        """Estimate formality score 1-10"""
-        formal_keywords = ['dress', 'suit', 'blazer', 'formal', 'business']
-        casual_keywords = ['t-shirt', 'tank', 'hoodie', 'shorts', 'athletic']
+        """Enhanced formality score calculation 1-10"""
+        formal_keywords = {
+            'suit': 10, 'tuxedo': 10, 'formal dress': 9, 'evening gown': 9,
+            'dress shirt': 8, 'blazer': 8, 'dress pants': 8, 'dress shoes': 8,
+            'business': 7, 'office': 7, 'professional': 7, 'blouse': 7,
+            'polo': 6, 'chinos': 6, 'loafers': 6, 'cardigan': 6
+        }
+        
+        casual_keywords = {
+            't-shirt': 2, 'tank top': 1, 'hoodie': 2, 'sweatshirt': 2,
+            'shorts': 2, 'athletic': 1, 'gym': 1, 'workout': 1, 'sport': 1,
+            'sneakers': 3, 'flip-flops': 1, 'sandals': 2, 'running': 1,
+            'yoga': 1, 'joggers': 2, 'leggings': 2
+        }
         
         name_lower = name.lower()
         category_lower = category.lower()
+        combined_text = f"{name_lower} {category_lower}"
         
-        if any(word in name_lower or word in category_lower for word in formal_keywords):
-            return 8
-        elif any(word in name_lower or word in category_lower for word in casual_keywords):
-            return 2
-        else:
-            return 5
+        # Check for formal keywords first (higher priority)
+        max_formal_score = 0
+        for keyword, score in formal_keywords.items():
+            if keyword in combined_text:
+                max_formal_score = max(max_formal_score, score)
+        
+        if max_formal_score > 0:
+            return max_formal_score
+        
+        # Check for casual keywords
+        min_casual_score = 10
+        for keyword, score in casual_keywords.items():
+            if keyword in combined_text:
+                min_casual_score = min(min_casual_score, score)
+        
+        if min_casual_score < 10:
+            return min_casual_score
+        
+        # Category-based defaults if no keywords match
+        category_defaults = {
+            'formal': 8,
+            'dress': 7,
+            'tops': 5,
+            'bottoms': 5,
+            'shoes': 5,
+            'outerwear': 6,
+            'sportswear': 2,
+            'athletic': 1
+        }
+        
+        for cat, score in category_defaults.items():
+            if cat in category_lower:
+                return score
+        
+        return 5  # Default middle score
     
     def _get_comfort_score(self, category: str) -> int:
         """Estimate comfort score 1-10"""
@@ -213,14 +302,14 @@ class EnhancedOutfitService:
     
     def calculate_item_compatibility_score(self, item: Dict, weather_data: Dict, 
                                          occasion: str) -> float:
-        """Calculate AI compatibility score for clothing item"""
+        """Calculate enhanced AI compatibility score for clothing item"""
         score = 0.0
         
-        # Temperature compatibility (40% weight)
+        # Temperature compatibility (35% weight)
         temp = weather_data.get('temperature', 20)
         temp_min, temp_max = item['temp_range']
         if temp_min <= temp <= temp_max:
-            temp_score = 40.0
+            temp_score = 35.0
             # Bonus for optimal range
             optimal_temp = (temp_min + temp_max) / 2
             temp_distance = abs(temp - optimal_temp)
@@ -229,40 +318,86 @@ class EnhancedOutfitService:
         else:
             # Penalty for being outside range
             temp_distance = min(abs(temp - temp_min), abs(temp - temp_max))
-            temp_score = max(0, 40.0 - (temp_distance * 2))
+            temp_score = max(0, 35.0 - (temp_distance * 2))
         
         score += temp_score
         
-        # Occasion matching (30% weight)
+        # Occasion matching (35% weight - increased importance)
         occasion_formality_range = self.outfit_rules['occasion_formality'].get(occasion, (1, 10))
         item_formality = item['formality_score']
         
         if occasion_formality_range[0] <= item_formality <= occasion_formality_range[1]:
-            occasion_score = 30.0
+            occasion_score = 35.0
         else:
             # Penalty based on how far outside the range
             if item_formality < occasion_formality_range[0]:
-                penalty = (occasion_formality_range[0] - item_formality) * 3
+                penalty = (occasion_formality_range[0] - item_formality) * 4
             else:
-                penalty = (item_formality - occasion_formality_range[1]) * 3
-            occasion_score = max(0, 30.0 - penalty)
+                penalty = (item_formality - occasion_formality_range[1]) * 4
+            occasion_score = max(0, 35.0 - penalty)
         
-        score += occasion_score
+        # Bonus for occasion-specific preferred items
+        occasion_rules = self.outfit_rules.get('occasion_specific_rules', {}).get(occasion, {})
+        preferred_items = occasion_rules.get('preferred_items', [])
+        avoid_items = occasion_rules.get('avoid_items', [])
         
-        # Weather condition compatibility (20% weight)
+        item_name_lower = item.get('name', '').lower()
+        item_category_lower = item.get('category', '').lower()
+        
+        # Check for preferred items bonus
+        for preferred in preferred_items:
+            if preferred in item_name_lower or preferred in item_category_lower:
+                occasion_score += 5.0
+                break
+        
+        # Check for avoided items penalty
+        for avoided in avoid_items:
+            if avoided in item_name_lower or avoided in item_category_lower:
+                occasion_score -= 10.0
+                break
+        
+        score += max(occasion_score, 0)
+        
+        # Weather condition compatibility (15% weight)
         weather_conditions = self._extract_weather_conditions(weather_data)
         weather_score = 0
         for condition in weather_conditions:
             if condition in item['weather_compatibility']:
-                weather_score += 20.0 / len(weather_conditions)
+                weather_score += 15.0 / len(weather_conditions)
         
-        score += min(weather_score, 20.0)
+        score += min(weather_score, 15.0)
         
-        # Comfort score (10% weight)
-        comfort_score = (item['comfort_score'] / 10) * 10.0
+        # Color preference for occasion (10% weight)
+        color_score = self._calculate_color_preference_score(item, occasion)
+        score += color_score
+        
+        # Comfort and versatility (5% weight)
+        comfort_score = (item['comfort_score'] / 10) * 5.0
         score += comfort_score
         
         return min(score, 100.0)
+    
+    def _calculate_color_preference_score(self, item: Dict, occasion: str) -> float:
+        """Calculate color preference score for the occasion"""
+        occasion_rules = self.outfit_rules.get('occasion_specific_rules', {}).get(occasion, {})
+        preferred_colors = occasion_rules.get('color_preferences', [])
+        
+        if not preferred_colors:
+            return 5.0  # Default score if no preferences
+        
+        item_color = item.get('color', '').lower()
+        
+        # Direct color match
+        for preferred_color in preferred_colors:
+            if preferred_color.lower() in item_color or item_color in preferred_color.lower():
+                return 10.0
+        
+        # Neutral colors work for most occasions
+        neutral_colors = self.color_harmony_rules['neutral_colors']
+        if any(neutral in item_color for neutral in neutral_colors):
+            return 7.0
+        
+        return 3.0  # Non-preferred color penalty
     
     def _extract_weather_conditions(self, weather_data: Dict) -> List[str]:
         """Extract weather conditions from weather data"""
@@ -398,6 +533,110 @@ class EnhancedOutfitService:
                 'error': 'Failed to generate recommendation',
                 'message': str(e)
             }
+    
+    def generate_multi_occasion_recommendations(self, user_id: int, weather_data: Dict) -> Dict:
+        """Generate outfit recommendations for all occasions"""
+        occasions = ['casual', 'work', 'formal', 'workout', 'datenight']
+        recommendations = {}
+        
+        try:
+            # Get user's wardrobe items once
+            wardrobe_items = self.get_user_wardrobe_items(user_id)
+            
+            if not wardrobe_items:
+                return {
+                    'error': 'No wardrobe items found',
+                    'message': 'Please add some clothes to your wardrobe first!',
+                    'recommendations': {}
+                }
+            
+            # Generate recommendation for each occasion
+            for occasion in occasions:
+                try:
+                    outfit = self.generate_outfit_recommendation(user_id, weather_data, occasion)
+                    recommendations[occasion] = outfit
+                except Exception as e:
+                    logger.error(f"Failed to generate {occasion} outfit: {e}")
+                    recommendations[occasion] = {
+                        'error': f'Failed to generate {occasion} outfit',
+                        'message': str(e),
+                        'items': [],
+                        'confidence': 0
+                    }
+            
+            # Calculate overall wardrobe analysis
+            analysis = self._analyze_wardrobe_for_occasions(wardrobe_items, recommendations)
+            
+            return {
+                'recommendations': recommendations,
+                'wardrobe_analysis': analysis,
+                'weather_context': weather_data,
+                'generated_at': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating multi-occasion recommendations: {e}")
+            return {
+                'error': 'Failed to generate recommendations',
+                'message': str(e),
+                'recommendations': {}
+            }
+    
+    def _analyze_wardrobe_for_occasions(self, wardrobe_items: List[Dict], 
+                                      recommendations: Dict) -> Dict:
+        """Analyze wardrobe completeness for different occasions"""
+        analysis = {
+            'total_items': len(wardrobe_items),
+            'categories_available': list(set(item['category'].lower() for item in wardrobe_items)),
+            'occasion_readiness': {},
+            'recommendations_quality': {},
+            'wardrobe_gaps': []
+        }
+        
+        # Analyze readiness for each occasion
+        for occasion, outfit in recommendations.items():
+            if not outfit.get('error'):
+                confidence = outfit.get('confidence', 0)
+                item_count = len(outfit.get('items', []))
+                
+                analysis['occasion_readiness'][occasion] = {
+                    'confidence': confidence,
+                    'item_count': item_count,
+                    'status': 'excellent' if confidence > 85 else 'good' if confidence > 70 else 'fair' if confidence > 50 else 'poor'
+                }
+                
+                analysis['recommendations_quality'][occasion] = confidence
+            else:
+                analysis['occasion_readiness'][occasion] = {
+                    'confidence': 0,
+                    'item_count': 0,
+                    'status': 'unavailable'
+                }
+                analysis['recommendations_quality'][occasion] = 0
+        
+        # Identify wardrobe gaps
+        occasion_rules = self.outfit_rules.get('occasion_specific_rules', {})
+        for occasion, rules in occasion_rules.items():
+            if occasion in recommendations:
+                outfit = recommendations[occasion]
+                if outfit.get('error') or outfit.get('confidence', 0) < 60:
+                    preferred_items = rules.get('preferred_items', [])
+                    missing_items = []
+                    
+                    for preferred in preferred_items[:3]:  # Check top 3 preferred items
+                        found = any(preferred in item.get('name', '').lower() or 
+                                  preferred in item.get('category', '').lower() 
+                                  for item in wardrobe_items)
+                        if not found:
+                            missing_items.append(preferred)
+                    
+                    if missing_items:
+                        analysis['wardrobe_gaps'].append({
+                            'occasion': occasion,
+                            'missing_items': missing_items
+                        })
+        
+        return analysis
     
     def _generate_outfit_reason(self, items: List[Dict], weather_data: Dict, occasion: str) -> str:
         """Generate explanation for outfit choice"""

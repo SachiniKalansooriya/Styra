@@ -11,10 +11,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import userService from '../services/userService';
-import connectionService from '../services/connectionService';
+import authService from '../services/authService';
 
-export const LoginScreen = ({ navigation, backendConnected }) => {
+export const LoginScreen = ({ navigation, onAuthSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,27 +25,31 @@ export const LoginScreen = ({ navigation, backendConnected }) => {
       return;
     }
 
+    // Basic email validation
+    if (!authService.validateEmail(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     
     try {
-      if (backendConnected) {
-        // Try to login via API
-        const response = await userService.login({ email, password });
-        Alert.alert('Success', 'Welcome back!', [
-          { text: 'OK', onPress: () => navigation.navigate('Home') }
-        ]);
+      const result = await authService.signIn(email.trim().toLowerCase(), password);
+      
+      if (result.success) {
+        // Call the authentication success handler
+        if (onAuthSuccess) {
+          onAuthSuccess(result.user);
+        } else {
+          // Fallback if no handler provided
+          navigation.navigate('Home');
+        }
       } else {
-        // Fallback to mock login when backend is not available
-        console.log('Backend not available, using mock login');
-        setTimeout(() => {
-          Alert.alert('Success', 'Welcome back! (Offline Mode)', [
-            { text: 'OK', onPress: () => navigation.navigate('Home') }
-          ]);
-        }, 1000);
+        Alert.alert('Login Failed', result.error || 'Invalid credentials');
       }
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Login Failed', error.message || 'Please try again');
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

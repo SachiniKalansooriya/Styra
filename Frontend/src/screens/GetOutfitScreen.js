@@ -22,6 +22,8 @@ import weatherService from '../services/weatherService';
 
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
+  const [multiOutfits, setMultiOutfits] = useState(null); // New state for multiple recommendations
+  const [showMultiView, setShowMultiView] = useState(false); // Toggle between single and multi view
   const [loading, setLoading] = useState(false);
   const [regeneratingItem, setRegeneratingItem] = useState(null); // Track which item is being regenerated
   const [weatherInfo, setWeatherInfo] = useState(null);
@@ -367,6 +369,116 @@ const generateOutfit = async () => {
     //   'Could not connect to AI service. Showing demo outfit.',
     //   [{ text: 'OK' }]
     // );
+  } finally {
+    setLoading(false);
+  }
+};
+
+// New function to generate multi-occasion recommendations
+const generateMultiOutfits = async () => {
+  setLoading(true);
+  
+  try {
+    let requestData;
+    
+    if (demoMode) {
+      requestData = {
+        user_id: 1,
+        demo_weather: {
+          temperature: parseInt(demoTemperature),
+          condition: demoCondition,
+          humidity: 60,
+          windSpeed: 10,
+          precipitation: 0,
+          location: 'Demo Location'
+        },
+        occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
+      };
+    } else {
+      requestData = {
+        user_id: 1,
+        location: location ? {
+          latitude: location.latitude,
+          longitude: location.longitude
+        } : {
+          latitude: 40.7128,
+          longitude: -74.0060
+        },
+        occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
+      };
+    }
+    
+    console.log('Generating multi-occasion outfits:', requestData);
+    
+    const data = await apiService.post('/api/outfit/enhanced-recommendations', requestData);
+    
+    console.log('Multi-outfit API Response:', data);
+    
+    if (data.status === 'success' && data.recommendations) {
+      console.log('Setting multi outfits from API:', data.recommendations);
+      setMultiOutfits(data);
+      setShowMultiView(true);
+      
+      // Set weather info
+      if (data.weather) {
+        const weatherData = {
+          ...data.weather,
+          location: data.weather?.location || 'Current Location'
+        };
+        setWeatherInfo(weatherData);
+      }
+    } else {
+      // Fallback to mock data
+      console.log('Using fallback multi outfits');
+      const fallbackMultiOutfits = {
+        status: 'success',
+        recommendations: {
+          casual: mockOutfits.casual,
+          work: mockOutfits.work,
+          formal: { ...mockOutfits.work, confidence: 85, reason: 'Perfect for formal events' },
+          workout: { ...mockOutfits.casual, confidence: 90, reason: 'Great for gym and exercise' },
+          datenight: { ...mockOutfits.work, confidence: 88, reason: 'Stylish choice for romantic dinner' }
+        },
+        wardrobe_analysis: {
+          total_items: 15,
+          occasion_readiness: {
+            casual: { confidence: 92, status: 'excellent' },
+            work: { confidence: 88, status: 'good' },
+            formal: { confidence: 85, status: 'good' },
+            workout: { confidence: 90, status: 'excellent' },
+            datenight: { confidence: 88, status: 'good' }
+          }
+        }
+      };
+      setMultiOutfits(fallbackMultiOutfits);
+      setShowMultiView(true);
+    }
+  } catch (error) {
+    console.error('Multi-outfit generation error:', error);
+    
+    // Show fallback multi outfits
+    const fallbackMultiOutfits = {
+      status: 'success',
+      recommendations: {
+        casual: mockOutfits.casual,
+        work: mockOutfits.work,
+        formal: { ...mockOutfits.work, confidence: 85, reason: 'Perfect for formal events' },
+        workout: { ...mockOutfits.casual, confidence: 90, reason: 'Great for gym and exercise' },
+        datenight: { ...mockOutfits.work, confidence: 88, reason: 'Stylish choice for romantic dinner' }
+      },
+      wardrobe_analysis: {
+        total_items: 15,
+        occasion_readiness: {
+          casual: { confidence: 92, status: 'excellent' },
+          work: { confidence: 88, status: 'good' },
+          formal: { confidence: 85, status: 'good' },
+          workout: { confidence: 90, status: 'excellent' },
+          datenight: { confidence: 88, status: 'good' }
+        }
+      }
+    };
+    setMultiOutfits(fallbackMultiOutfits);
+    setShowMultiView(true);
   } finally {
     setLoading(false);
   }
@@ -915,6 +1027,118 @@ const handleLikeOutfit = async () => {
     </View>
   );
 
+  const renderMultiOutfitView = () => {
+    if (!multiOutfits || !multiOutfits.recommendations) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="grid-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyTitle}>No Multi-Occasion Outfits</Text>
+          <Text style={styles.emptyText}>Tap the grid button to get outfit suggestions for all occasions</Text>
+          <TouchableOpacity style={styles.generateButton} onPress={generateMultiOutfits}>
+            <Text style={styles.generateButtonText}>Generate All Outfits</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    const occasions = [
+      { key: 'casual', name: 'Casual', icon: 'shirt-outline', color: '#4ECDC4' },
+      { key: 'work', name: 'Work', icon: 'briefcase-outline', color: '#FF6B6B' },
+      { key: 'formal', name: 'Formal', icon: 'business-outline', color: '#9B59B6' },
+      { key: 'workout', name: 'Workout', icon: 'fitness-outline', color: '#2ECC71' },
+      { key: 'datenight', name: 'Date Night', icon: 'heart-outline', color: '#E74C3C' }
+    ];
+
+    return (
+      <View style={styles.multiOutfitContainer}>
+        <Text style={styles.multiOutfitTitle}>Outfit Recommendations for All Occasions</Text>
+        
+        {multiOutfits.wardrobe_analysis && (
+          <View style={styles.analysisCard}>
+            <Text style={styles.analysisTitle}>Wardrobe Analysis</Text>
+            <Text style={styles.analysisText}>
+              {multiOutfits.wardrobe_analysis.total_items} items in your wardrobe
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.occasionGrid}>
+          {occasions.map((occasion) => {
+            const outfit = multiOutfits.recommendations[occasion.key];
+            const readiness = multiOutfits.wardrobe_analysis?.occasion_readiness?.[occasion.key];
+            
+            return (
+              <TouchableOpacity
+                key={occasion.key}
+                style={[styles.occasionCard, { borderColor: occasion.color }]}
+                onPress={() => {
+                  if (outfit && !outfit.error) {
+                    setCurrentOutfit(outfit);
+                    setOccasion(occasion.key);
+                    setShowMultiView(false);
+                  }
+                }}
+              >
+                <View style={[styles.occasionHeader, { backgroundColor: occasion.color }]}>
+                  <Ionicons name={occasion.icon} size={24} color="#fff" />
+                  <Text style={styles.occasionName}>{occasion.name}</Text>
+                </View>
+                
+                <View style={styles.occasionContent}>
+                  {outfit && !outfit.error ? (
+                    <>
+                      <View style={styles.confidenceRow}>
+                        <Text style={styles.confidenceLabel}>Match: {outfit.confidence}%</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: 
+                          readiness?.status === 'excellent' ? '#2ECC71' :
+                          readiness?.status === 'good' ? '#F39C12' :
+                          readiness?.status === 'fair' ? '#E67E22' : '#E74C3C'
+                        }]}>
+                          <Text style={styles.statusText}>
+                            {readiness?.status || 'good'}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.outfitPreview}>
+                        {outfit.items && outfit.items.slice(0, 3).map((item, index) => (
+                          <View key={index} style={styles.previewItem}>
+                            <Image 
+                              source={{ 
+                                uri: item.image_path ? 
+                                  `http://172.20.10.7:8000${item.image_path}` : 
+                                  'https://via.placeholder.com/50'
+                              }} 
+                              style={styles.previewImage} 
+                            />
+                            <Text style={styles.previewItemText} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                      
+                      <Text style={styles.outfitReason} numberOfLines={2}>
+                        {outfit.reason}
+                      </Text>
+                    </>
+                  ) : (
+                    <View style={styles.errorContent}>
+                      <Ionicons name="alert-circle-outline" size={32} color="#E74C3C" />
+                      <Text style={styles.errorText}>
+                        {outfit?.message || 'No suitable items found'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -922,23 +1146,47 @@ const handleLikeOutfit = async () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Get Outfit</Text>
-        <TouchableOpacity onPress={generateOutfit}>
-          <Ionicons name="refresh" size={24} color="#FF8C42" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={[styles.viewToggle, !showMultiView && styles.activeViewToggle]}
+            onPress={() => setShowMultiView(false)}
+          >
+            <Ionicons name="shirt-outline" size={16} color={!showMultiView ? "#fff" : "#FF8C42"} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.viewToggle, showMultiView && styles.activeViewToggle]}
+            onPress={() => {
+              if (!multiOutfits) {
+                generateMultiOutfits();
+              } else {
+                setShowMultiView(true);
+              }
+            }}
+          >
+            <Ionicons name="grid-outline" size={16} color={showMultiView ? "#fff" : "#FF8C42"} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={showMultiView ? generateMultiOutfits : generateOutfit}>
+            <Ionicons name="refresh" size={24} color="#FF8C42" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content}>
         {weatherInfo && renderWeatherCard()}
         
-        {renderDemoControls()}
+        {!showMultiView && renderDemoControls()}
         
-        {renderOccasionSelector()}
+        {!showMultiView && renderOccasionSelector()}
 
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#FF8C42" />
-            <Text style={styles.loadingText}>Generating your perfect outfit...</Text>
+            <Text style={styles.loadingText}>
+              {showMultiView ? 'Generating outfits for all occasions...' : 'Generating your perfect outfit...'}
+            </Text>
           </View>
+        ) : showMultiView ? (
+          renderMultiOutfitView()
         ) : currentOutfit ? (
           renderOutfitItems()
         ) : (
@@ -1389,6 +1637,139 @@ wearButton: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Header actions styles
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewToggle: {
+    padding: 8,
+    marginRight: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FF8C42',
+  },
+  activeViewToggle: {
+    backgroundColor: '#FF8C42',
+  },
+  // Multi-outfit view styles
+  multiOutfitContainer: {
+    padding: 15,
+  },
+  multiOutfitTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  analysisCard: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  analysisTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  analysisText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  occasionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  occasionCard: {
+    width: '48%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 2,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  occasionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+  },
+  occasionName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  occasionContent: {
+    padding: 12,
+  },
+  confidenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  confidenceLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  outfitPreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  previewItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  previewImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 4,
+  },
+  previewItemText: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center',
+  },
+  outfitReason: {
+    fontSize: 11,
+    color: '#888',
+    lineHeight: 14,
+  },
+  errorContent: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  errorText: {
+    fontSize: 11,
+    color: '#E74C3C',
+    textAlign: 'center',
+    marginTop: 5,
   },
 });
 

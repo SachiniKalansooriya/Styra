@@ -12,8 +12,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import authService from '../services/authService';
 
-export const SignUpScreen = ({ navigation }) => {
+export const SignUpScreen = ({ navigation, onAuthSuccess }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -26,30 +27,56 @@ export const SignUpScreen = ({ navigation }) => {
   const handleSignUp = async () => {
     const { name, email, password, confirmPassword } = formData;
     
+    // Basic field validation
     if (!name || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
     
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    // Use auth service validation
+    const validation = authService.validateSignupForm(formData);
+    if (!validation.isValid) {
+      Alert.alert('Validation Error', validation.errors.join('\n'));
       return;
     }
 
     setLoading(true);
     
-    // Simulate sign up process
-    setTimeout(() => {
+    try {
+      const result = await authService.signUp({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password
+      });
+
+      if (result.success) {
+        Alert.alert(
+          'Success', 
+          result.message || 'Account created successfully!',
+          [
+            { 
+              text: 'OK', 
+              onPress: () => {
+                // Call the authentication success handler
+                if (onAuthSuccess) {
+                  onAuthSuccess(result.user);
+                } else {
+                  // Fallback if no handler provided
+                  navigation.navigate('Home');
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Signup Failed', result.error || 'Unable to create account');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
       setLoading(false);
-      Alert.alert('Success', 'Account created successfully!', [
-        { text: 'OK', onPress: () => navigation.navigate('Home') }
-      ]);
-    }, 1500);
+    }
   };
 
   const updateFormData = (field, value) => {

@@ -21,7 +21,7 @@ import weatherService from '../services/weatherService';
 
 const { width } = Dimensions.get('window');
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = ({ navigation, onLogout }) => {
   const { theme } = useTheme();
   const [user, setUser] = useState({ name: 'Fashion Lover' });
   const [wardrobeStats, setWardrobeStats] = useState({
@@ -606,6 +606,32 @@ const HomeScreen = ({ navigation }) => {
             >
               <Ionicons name="notifications-outline" size={24} color={theme.text} />
             </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.logoutButton}
+              onPress={() => {
+                Alert.alert(
+                  'Logout',
+                  'Are you sure you want to logout?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Logout', 
+                      style: 'destructive',
+                      onPress: () => {
+                        if (onLogout) {
+                          onLogout();
+                        } else {
+                          navigation.navigate('Landing');
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="log-out-outline" size={24} color={theme.text} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -837,6 +863,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   notificationButton: {
+    padding: 5,
+    marginRight: 10,
+  },
+  logoutButton: {
     padding: 5,
   },
   content: {

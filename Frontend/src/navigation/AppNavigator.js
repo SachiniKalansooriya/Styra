@@ -23,7 +23,7 @@ export const AppNavigator = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator 
-        initialRouteName="Home"
+        initialRouteName="Landing"
         screenOptions={{
           headerShown: false,
           gestureEnabled: true,
