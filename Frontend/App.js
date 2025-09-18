@@ -8,17 +8,26 @@ import HomeScreen from './src/screens/HomeScreen';
 import MyWardrobeScreen from './src/screens/MyWardrobeScreen';
 import GetOutfitScreen from './src/screens/GetOutfitScreen';
 import TripPlannerScreen from './src/screens/TripPlannerScreen';
+import PackingListResultsScreen from './src/screens/PackingListResultsScreen';
+import SavedTripsScreen from './src/screens/SavedTripsScreen';
 import AddClothesScreen from './src/screens/AddClothesScreen';
 import FavoriteOutfitsScreen from './src/screens/FavoriteOutfitsScreen';
 import WornOutfitsScreen from './src/screens/WornOutfitsScreen';
 import connectionService from './src/services/connectionService';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState('Landing');
+  const [currentScreen, setCurrentScreen] = useState('Home'); // Changed from 'Landing' to 'Home'
   const [screenParams, setScreenParams] = useState({});
   const [backendConnected, setBackendConnected] = useState(false);
 
   const navigate = (screenName, params = {}) => {
+    console.log('=== NAVIGATION CALLED ===');
+    console.log('Navigating to:', screenName);
+    console.log('With params:', params);
+    console.log('From screen:', currentScreen);
+    console.log('Call stack:', new Error().stack);
+    console.log('========================');
+    
     setCurrentScreen(screenName);
     setScreenParams(params);
   };
@@ -49,6 +58,11 @@ export default function App() {
   }, []);
 
   const renderScreen = () => {
+    console.log('=== RENDER SCREEN DEBUG ===');
+    console.log('Current screen:', currentScreen);
+    console.log('Screen params:', screenParams);
+    console.log('=========================');
+    
     const navigationProps = { 
       navigation: { 
         navigate, 
@@ -76,6 +90,10 @@ export default function App() {
         return <GetOutfitScreen {...navigationProps} />;
       case 'TripPlanner':
         return <TripPlannerScreen {...navigationProps} />;
+      case 'PackingListResults':
+        return <PackingListResultsScreen {...navigationProps} />;
+      case 'SavedTrips':
+        return <SavedTripsScreen {...navigationProps} />;
       case 'FavoriteOutfits':
         return <FavoriteOutfitsScreen {...navigationProps} />;
       case 'WornOutfits':

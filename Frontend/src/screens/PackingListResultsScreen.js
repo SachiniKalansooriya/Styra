@@ -11,14 +11,62 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import tripService from '../services/tripService';
 
 const PackingListResultsScreen = ({ navigation, route }) => {
+  console.log('=== PackingListResults Screen Loaded ===');
   console.log('PackingListResults - Route params:', route?.params);
+  console.log('PackingListResults - Navigation object:', navigation);
   
   const { tripDetails, packingResult } = route?.params || {};
   
+  console.log('Extracted tripDetails:', tripDetails);
+  console.log('Extracted packingResult:', packingResult);
+  
   const [loading, setLoading] = useState(false);
   const [checkedItems, setCheckedItems] = useState({});
+
+  const handleSaveTrip = async () => {
+    if (!tripDetails || !packingResult) {
+      Alert.alert('Error', 'Trip details or packing results are missing');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('Saving trip to database...');
+      console.log('Trip details to save:', tripDetails);
+      console.log('Packing result to save:', packingResult);
+
+      const savedTrip = await tripService.saveTrip(tripDetails, packingResult);
+      
+      console.log('Trip saved successfully:', savedTrip);
+      
+      Alert.alert(
+        'Success!', 
+        'Your trip has been saved successfully!',
+        [
+          {
+            text: 'View Saved Trips',
+            onPress: () => navigation.navigate('SavedTrips')
+          },
+          {
+            text: 'OK',
+            style: 'default'
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error saving trip:', error);
+      Alert.alert(
+        'Error', 
+        'Failed to save trip. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Error handling for missing data
   if (!tripDetails) {
@@ -194,6 +242,16 @@ const PackingListResultsScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* DEBUG: Show we're in the right screen */}
+      <View style={{backgroundColor: 'red', padding: 10}}>
+        <Text style={{color: 'white', fontSize: 16, fontWeight: 'bold'}}>
+          🔍 PACKING LIST SCREEN LOADED 🔍
+        </Text>
+        <Text style={{color: 'white'}}>
+          Categories: {categories?.length || 0} | Trip: {tripDetails?.destination || 'Unknown'}
+        </Text>
+      </View>
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -259,12 +317,15 @@ const PackingListResultsScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={styles.primaryButton}
-          onPress={() => {
-            Alert.alert('Success!', 'Packing list ready!');
-          }}
+          style={[styles.primaryButton, loading && styles.disabledButton]}
+          onPress={handleSaveTrip}
+          disabled={loading}
         >
-          <Text style={styles.primaryButtonText}>Save Trip</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Save Trip</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -488,6 +549,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
   primaryButtonText: {
     color: '#fff',

@@ -18,6 +18,7 @@ from services.trip_ai_generator import trip_ai_generator
 from services.enhanced_outfit_service import enhanced_outfit_service
 from services.favorite_outfit_service import favorite_outfit_service
 from services.weather_service import weather_service
+from services.trip_service import trip_service
 from datetime import datetime
 import json
 import glob
@@ -500,10 +501,24 @@ async def get_ai_outfit_recommendation(request_data: dict):
     try:
         user_id = request_data.get('user_id', 1)
         location = request_data.get('location', {})
+        demo_weather = request_data.get('demo_weather')
         occasion = request_data.get('occasion', 'casual')
         
+        # Check if demo weather is provided
+        if demo_weather:
+            # Use demo weather data
+            weather_data = {
+                'temperature': demo_weather.get('temperature', 25),
+                'condition': demo_weather.get('condition', 'sunny'),
+                'humidity': demo_weather.get('humidity', 60),
+                'windSpeed': demo_weather.get('windSpeed', 10),
+                'precipitation': demo_weather.get('precipitation', 0),
+                'location': demo_weather.get('location', 'Demo Location')
+            }
+            logger.info(f"Using demo weather data: {weather_data}")
+            
         # Get real weather data if location is provided
-        if location.get('latitude') and location.get('longitude'):
+        elif location.get('latitude') and location.get('longitude'):
             try:
                 weather_data = weather_service.get_current_weather(
                     location['latitude'], 
@@ -755,46 +770,37 @@ async def enhanced_packing_recommendations(request_data: dict):
 async def get_user_trips(user_id: int = 1):
     """Get user's saved trips"""
     try:
-        # TODO: Implement database query for user trips
-        # For now, return mock data
-        mock_trips = [
-            {
-                "id": "1",
-                "destination": "Paris",
-                "startDate": "2024-03-15",
-                "endDate": "2024-03-22",
-                "duration": 7,
-                "activities": ["City Sightseeing", "Fine Dining", "Museums/Cultural"],
-                "packingStyle": "fashion",
-                "created_at": "2024-02-01"
-            }
-        ]
+        logger.info(f"Getting trips for user: {user_id}")
+        
+        # Use the trip service to get from database
+        trips = trip_service.get_user_trips(user_id)
         
         return {
             "status": "success",
-            "trips": mock_trips
+            "trips": trips,
+            "count": len(trips)
         }
     except Exception as e:
         logger.error(f"Get trips error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve trips")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve trips: {str(e)}")
 
 @app.post("/api/trips")
 async def save_trip(trip_data: dict):
     """Save trip details and packing list"""
     try:
-        trip_id = str(uuid.uuid4())
+        logger.info(f"Saving trip: {trip_data.get('destination', 'Unknown')}")
         
-        # TODO: Save to database
-        # For now, just return success
+        # Use the trip service to save to database
+        result = trip_service.save_trip(trip_data)
         
         return {
             "status": "success",
-            "trip_id": trip_id,
-            "message": "Trip saved successfully"
+            "trip_id": result["id"],
+            "message": "Trip saved successfully to database"
         }
     except Exception as e:
         logger.error(f"Save trip error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save trip")
+        raise HTTPException(status_code=500, detail=f"Failed to save trip: {str(e)}")
 
 # Weather Integration (Mock for now - can be enhanced with real weather API)
 @app.get("/api/weather/{lat}/{lon}")

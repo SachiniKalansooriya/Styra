@@ -10,6 +10,8 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  TextInput,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -26,6 +28,11 @@ const GetOutfitScreen = ({ navigation }) => {
   const [occasion, setOccasion] = useState('casual');
   const [location, setLocation] = useState(null);
   const [locationPermission, setLocationPermission] = useState(null);
+  
+  // Demo weather feature
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoTemperature, setDemoTemperature] = useState('25');
+  const [demoCondition, setDemoCondition] = useState('sunny');
 
   const occasions = [
     { id: 'casual', name: 'Casual', icon: 'shirt' },
@@ -256,23 +263,61 @@ const generateOutfit = async () => {
   setLoading(true);
   
   try {
-    // Use default location if not available
-    const locationData = location || {
-      latitude: 37.7749,
-      longitude: -122.4194,
-    };
+    let requestData;
     
-    console.log('Starting outfit generation...', { locationData, occasion });
+    if (demoMode) {
+      // Demo mode: use manual temperature input
+      console.log('Demo mode: Using manual weather input', { 
+        temperature: demoTemperature, 
+        condition: demoCondition,
+        occasion 
+      });
+      
+      requestData = {
+        user_id: 1,
+        demo_weather: {
+          temperature: parseInt(demoTemperature),
+          condition: demoCondition,
+          humidity: 60, // Default demo values
+          windSpeed: 10,
+          precipitation: 0,
+          location: 'Demo Location'
+        },
+        occasion: occasion
+      };
+      
+      // Update weather info immediately for demo
+      setWeatherInfo({
+        temperature: parseInt(demoTemperature),
+        condition: demoCondition,
+        humidity: 60,
+        windSpeed: 10,
+        precipitation: 0,
+        location: 'Demo Mode',
+        icon: getWeatherIcon(demoCondition)
+      });
+      
+    } else {
+      // Real weather mode: use GPS location
+      const locationData = location || {
+        latitude: 37.7749,
+        longitude: -122.4194,
+      };
+      
+      console.log('Real weather mode: Using GPS location', { locationData, occasion });
+      
+      requestData = {
+        user_id: 1,
+        location: {
+          latitude: locationData.latitude,
+          longitude: locationData.longitude
+        },
+        occasion: occasion
+      };
+    }
     
     // Call your AI recommendation endpoint using apiService
-    const data = await apiService.post('/api/outfit/ai-recommendation', {
-      user_id: 1, // Replace with actual user ID from your auth system
-      location: {
-        latitude: locationData.latitude,
-        longitude: locationData.longitude
-      },
-      occasion: occasion
-    });
+    const data = await apiService.post('/api/outfit/ai-recommendation', requestData);
     
     console.log('API Response:', data); // For debugging
     
@@ -731,6 +776,75 @@ const handleLikeOutfit = async () => {
     </View>
   );
 
+  const renderDemoControls = () => (
+    <View style={styles.demoCard}>
+      <View style={styles.demoHeader}>
+        <Text style={styles.demoTitle}>Weather Mode</Text>
+        <View style={styles.demoToggle}>
+          <Text style={[styles.demoModeText, !demoMode && styles.activeModeText]}>
+            Real Weather
+          </Text>
+          <Switch
+            value={demoMode}
+            onValueChange={setDemoMode}
+            trackColor={{ false: '#81b0ff', true: '#FF8C42' }}
+            thumbColor={demoMode ? '#fff' : '#f4f3f4'}
+          />
+          <Text style={[styles.demoModeText, demoMode && styles.activeModeText]}>
+            Demo Mode
+          </Text>
+        </View>
+      </View>
+      
+      {demoMode && (
+        <View style={styles.demoInputs}>
+          <View style={styles.demoRow}>
+            <Text style={styles.demoLabel}>Temperature (°C):</Text>
+            <TextInput
+              style={styles.demoInput}
+              value={demoTemperature}
+              onChangeText={setDemoTemperature}
+              keyboardType="numeric"
+              placeholder="25"
+            />
+          </View>
+          
+          <View style={styles.demoRow}>
+            <Text style={styles.demoLabel}>Weather Condition:</Text>
+            <View style={styles.conditionButtons}>
+              {['sunny', 'cloudy', 'rainy', 'cold'].map((condition) => (
+                <TouchableOpacity
+                  key={condition}
+                  style={[
+                    styles.conditionButton,
+                    demoCondition === condition && styles.selectedConditionButton
+                  ]}
+                  onPress={() => setDemoCondition(condition)}
+                >
+                  <Text style={[
+                    styles.conditionText,
+                    demoCondition === condition && styles.selectedConditionText
+                  ]}>
+                    {condition.charAt(0).toUpperCase() + condition.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.demoGenerateButton} 
+            onPress={generateOutfit}
+          >
+            <Text style={styles.demoGenerateButtonText}>
+              Generate with Demo Weather
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   const renderOutfitItems = () => (
     <View style={styles.outfitContainer}>
       <Text style={styles.outfitTitle}>Today's Recommendation</Text>
@@ -815,6 +929,8 @@ const handleLikeOutfit = async () => {
 
       <ScrollView style={styles.content}>
         {weatherInfo && renderWeatherCard()}
+        
+        {renderDemoControls()}
         
         {renderOccasionSelector()}
 
@@ -1180,6 +1296,99 @@ wearButton: {
     fontSize: 11,
     fontWeight: '600',
     marginLeft: 4,
+  },
+  // Demo controls styles
+  demoCard: {
+    backgroundColor: '#f8f9fa',
+    margin: 15,
+    padding: 15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  demoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  demoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  demoToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  demoModeText: {
+    fontSize: 12,
+    color: '#666',
+    marginHorizontal: 8,
+  },
+  activeModeText: {
+    color: '#FF8C42',
+    fontWeight: '600',
+  },
+  demoInputs: {
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    paddingTop: 15,
+  },
+  demoRow: {
+    marginBottom: 15,
+  },
+  demoLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
+  },
+  demoInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  conditionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  conditionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+  },
+  selectedConditionButton: {
+    backgroundColor: '#FF8C42',
+    borderColor: '#FF8C42',
+  },
+  conditionText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedConditionText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  demoGenerateButton: {
+    backgroundColor: '#FF8C42',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  demoGenerateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

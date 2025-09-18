@@ -54,12 +54,19 @@ const TripPlannerScreen = ({ navigation }) => {
   ];
 
   const handleActivityToggle = (activity) => {
-    setTripDetails(prev => ({
-      ...prev,
-      activities: prev.activities.includes(activity)
+    console.log('Activity toggle called for:', activity);
+    setTripDetails(prev => {
+      const newActivities = prev.activities.includes(activity)
         ? prev.activities.filter(a => a !== activity)
-        : [...prev.activities, activity]
-    }));
+        : [...prev.activities, activity];
+      const newState = {
+        ...prev,
+        activities: newActivities
+      };
+      console.log('Updated activities:', newActivities);
+      console.log('New tripDetails state:', newState);
+      return newState;
+    });
   };
 
   const handleGeneratePackingList = async () => {
@@ -94,12 +101,23 @@ const TripPlannerScreen = ({ navigation }) => {
       throw new Error('No packing result received');
     }
     
+    // Add detailed debugging
+    console.log('Navigation object:', navigation);
+    console.log('Trip details for navigation:', tripDetails);
+    console.log('Packing result for navigation:', JSON.stringify(packingResult, null, 2));
+    
     // Simple navigation test first
-    console.log('Attempting navigation...');
-    navigation.navigate('PackingListResults', { 
-      tripDetails,
-      packingResult
-    });
+    console.log('Attempting navigation to PackingListResults...');
+    try {
+      navigation.navigate('PackingListResults', { 
+        tripDetails,
+        packingResult
+      });
+      console.log('Navigation call completed successfully');
+    } catch (navError) {
+      console.error('Navigation error:', navError);
+      throw navError;
+    }
     
   } catch (error) {
     console.error('Complete error details:', error);
@@ -179,7 +197,14 @@ const TripPlannerScreen = ({ navigation }) => {
               style={styles.textInput}
               placeholder="Where are you going?"
               value={tripDetails.destination}
-              onChangeText={(text) => setTripDetails(prev => ({ ...prev, destination: text }))}
+              onChangeText={(text) => {
+                console.log('Destination input changed to:', text);
+                setTripDetails(prev => {
+                  const newState = { ...prev, destination: text };
+                  console.log('New tripDetails state:', newState);
+                  return newState;
+                });
+              }}
             />
           </View>
 
@@ -224,7 +249,15 @@ const TripPlannerScreen = ({ navigation }) => {
                   styles.weatherButton,
                   tripDetails.weatherExpected === weather && styles.selectedWeatherButton
                 ]}
-                onPress={() => setTripDetails(prev => ({ ...prev, weatherExpected: weather }))}
+                onPress={() => {
+                  console.log('Weather button pressed:', weather);
+                  setTripDetails(prev => {
+                    const newState = { ...prev, weatherExpected: weather };
+                    console.log('Updated weather to:', weather);
+                    console.log('New tripDetails state:', newState);
+                    return newState;
+                  });
+                }}
               >
                 <Ionicons 
                   name={

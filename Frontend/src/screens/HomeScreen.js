@@ -540,6 +540,14 @@ const HomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('TripPlanner')
     },
     {
+      id: 'saved-trips',
+      title: 'Saved Trips',
+      subtitle: 'Your trip history',
+      icon: 'airplane',
+      color: '#3498db',
+      onPress: () => navigation.navigate('SavedTrips')
+    },
+    {
       id: 'favorites',
       title: 'Favorites',
       subtitle: 'Saved outfits',
@@ -793,28 +801,6 @@ const HomeScreen = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-
-          {/* Debug Panel */}
-          {__DEV__ && (
-            <View style={styles.debugContainer}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Debug Panel</Text>
-              <View style={styles.debugButtons}>
-                <TouchableOpacity 
-                  style={styles.debugButton}
-                  onPress={() => checkBackendStatus()}
-                >
-                  <Text style={styles.debugButtonText}>Check Backend</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.debugButton}
-                  onPress={() => addSampleWardrobe()}
-                >
-                  <Text style={styles.debugButtonText}>Add Sample Items</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </SafeAreaView>
@@ -1030,6 +1016,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 16,
     overflow: 'hidden',
+    width: '100%', // Make the card full width
+    alignSelf: 'center',
   },
   featureGradient: {
     padding: 20,
