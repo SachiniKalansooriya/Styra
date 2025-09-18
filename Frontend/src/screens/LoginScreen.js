@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import authService from '../services/authService';
 
 export const LoginScreen = ({ navigation, onAuthSuccess }) => {
@@ -56,8 +57,8 @@ export const LoginScreen = ({ navigation, onAuthSuccess }) => {
   };
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <StatusBar style="light" />
+    <LinearGradient colors={['#f5f3f0', '#e9e6dd', '#ddd9cf']} style={styles.container}>
+      <StatusBar style="dark" />
       
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -69,7 +70,8 @@ export const LoginScreen = ({ navigation, onAuthSuccess }) => {
             style={styles.backButton}
             onPress={() => navigation.navigate('Landing')}
           >
-            <Text style={styles.backText}>← Back</Text>
+            <Icon name="arrow-back" size={20} color="#403c35" />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Welcome Back</Text>
         </View>
@@ -78,18 +80,18 @@ export const LoginScreen = ({ navigation, onAuthSuccess }) => {
         <View style={styles.formContainer}>
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
-              <Text style={styles.logoIcon}>👗</Text>
+              <Icon name="style" size={35} color="#403c35" />
             </View>
             <Text style={styles.brandName}>Styra</Text>
           </View>
 
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>📧</Text>
+              <Icon name="email" size={20} color="#403c35" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Email"
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="rgba(64, 60, 53, 0.6)"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -98,11 +100,11 @@ export const LoginScreen = ({ navigation, onAuthSuccess }) => {
             </View>
 
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>🔒</Text>
+              <Icon name="lock" size={20} color="#403c35" style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 placeholder="Password"
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="rgba(64, 60, 53, 0.6)"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -111,9 +113,11 @@ export const LoginScreen = ({ navigation, onAuthSuccess }) => {
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeIcon}
               >
-                <Text style={styles.eyeText}>
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
-                </Text>
+                <Icon 
+                  name={showPassword ? 'visibility' : 'visibility-off'} 
+                  size={20} 
+                  color="#403c35" 
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -157,16 +161,19 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 10,
     marginBottom: 10,
   },
   backText: {
-    color: 'white',
+    color: '#403c35',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 5,
   },
   headerTitle: {
-    color: 'white',
+    color: '#000',
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -183,18 +190,17 @@ const styles = StyleSheet.create({
   logoCircle: {
     width: 80,
     height: 80,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
-  },
-  logoIcon: {
-    fontSize: 35,
+    borderWidth: 2,
+    borderColor: '#d1cdc1',
   },
   brandName: {
     fontSize: 32,
-    color: 'white',
+    color: '#000',
     fontWeight: 'bold',
   },
   inputContainer: {
@@ -203,37 +209,36 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     borderRadius: 25,
     marginBottom: 15,
     paddingHorizontal: 20,
     height: 55,
+    borderWidth: 1,
+    borderColor: '#ddd9cf',
   },
   inputIcon: {
-    fontSize: 16,
     marginRight: 15,
   },
   input: {
     flex: 1,
-    color: 'white',
+    color: '#000',
     fontSize: 16,
   },
   eyeIcon: {
     padding: 5,
-  },
-  eyeText: {
-    fontSize: 16,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
     marginBottom: 30,
   },
   forgotPasswordText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: '#403c35',
     fontSize: 14,
+    textDecorationLine: 'underline',
   },
   loginButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#000',
     paddingVertical: 16,
     borderRadius: 25,
     alignItems: 'center',
@@ -245,10 +250,10 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   loginButtonDisabled: {
-    backgroundColor: 'rgba(255, 107, 107, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   loginButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -258,11 +263,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signupText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: '#403c35',
     fontSize: 16,
   },
   signupLink: {
-    color: '#FF6B6B',
+    color: '#000',
     fontSize: 16,
     fontWeight: 'bold',
   },
