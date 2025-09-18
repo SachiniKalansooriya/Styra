@@ -532,14 +532,6 @@ const HomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('MyWardrobe')
     },
     {
-      id: 'trip',
-      title: 'Trip Planner',
-      subtitle: 'Smart packing lists',
-      icon: 'bag',
-      color: '#FF8C42',
-      onPress: () => navigation.navigate('TripPlanner')
-    },
-    {
       id: 'saved-trips',
       title: 'Saved Trips',
       subtitle: 'Your trip history',
@@ -746,7 +738,7 @@ const HomeScreen = ({ navigation }) => {
             {/* AI Styling Feature Card */}
             <TouchableOpacity 
               style={styles.featureCard}
-              onPress={() => handleGetOutfit()}
+              onPress={() => navigation.navigate('BuyRecommendations')}
             >
               <LinearGradient
                 colors={['#ffecd2', '#fcb69f']}
@@ -756,17 +748,17 @@ const HomeScreen = ({ navigation }) => {
               >
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
-                    <Text style={[styles.featureTitle, { color: '#8B4513' }]}>AI Stylist</Text>
+                    <Text style={[styles.featureTitle, { color: '#8B4513' }]}>AI Shopping Assistant</Text>
                     <Text style={[styles.featureSubtitle, { color: '#8B4513' }]}>
-                      Get personalized outfit recommendations
+                      Get personalized buying recommendations
                     </Text>
                     <View style={[styles.featureButton, { backgroundColor: '#8B4513' }]}>
-                      <Text style={styles.featureButtonText}>Try Now</Text>
-                      <Ionicons name="sparkles" size={16} color="#fff" />
+                      <Text style={styles.featureButtonText}>Shop Smart</Text>
+                      <Ionicons name="bag-add" size={16} color="#fff" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>
-                    <Ionicons name="color-wand" size={50} color="#8B4513" />
+                    <Ionicons name="bag-add" size={50} color="#8B4513" />
                   </View>
                 </View>
               </LinearGradient>
@@ -1016,8 +1008,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 16,
     overflow: 'hidden',
-    width: '100%', // Make the card full width
-    alignSelf: 'center',
   },
   featureGradient: {
     padding: 20,

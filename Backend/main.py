@@ -19,6 +19,7 @@ from services.enhanced_outfit_service import enhanced_outfit_service
 from services.favorite_outfit_service import favorite_outfit_service
 from services.weather_service import weather_service
 from services.trip_service import trip_service
+from services.buy_recommendation_service import BuyRecommendationService
 from datetime import datetime
 import json
 import glob
@@ -1591,6 +1592,29 @@ async def add_sample_wardrobe():
         return {
             "status": "error", 
             "message": str(e)
+        }
+
+@app.post("/api/recommendations/buy")
+async def get_buy_recommendations(request_data: dict):
+    """Get AI-powered buying recommendations based on user's wardrobe"""
+    try:
+        user_id = request_data.get('user_id', 1)
+        
+        # Initialize the recommendation service
+        recommendation_service = BuyRecommendationService()
+        
+        # Get recommendations with analytics
+        result = recommendation_service.get_recommendations_with_analytics(user_id)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting buy recommendations: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to get recommendations: {str(e)}",
+            "recommendations": [],
+            "analytics": {}
         }
 
 # Mount static files for images - this should be done after all routes are defined

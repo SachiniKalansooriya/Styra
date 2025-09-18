@@ -13,6 +13,7 @@ import SavedTripsScreen from './src/screens/SavedTripsScreen';
 import AddClothesScreen from './src/screens/AddClothesScreen';
 import FavoriteOutfitsScreen from './src/screens/FavoriteOutfitsScreen';
 import WornOutfitsScreen from './src/screens/WornOutfitsScreen';
+import BuyRecommendationsScreen from './src/screens/BuyRecommendationsScreen';
 import connectionService from './src/services/connectionService';
 
 export default function App() {
@@ -98,6 +99,8 @@ export default function App() {
         return <FavoriteOutfitsScreen {...navigationProps} />;
       case 'WornOutfits':
         return <WornOutfitsScreen {...navigationProps} />;
+      case 'BuyRecommendations':
+        return <BuyRecommendationsScreen {...navigationProps} />;
       default:
         return <LandingScreen {...navigationProps} />;
     }
