@@ -18,12 +18,13 @@ import { useTheme } from '../themes/ThemeProvider';
 import wardrobeService from '../services/wardrobeService';
 import connectionService from '../services/connectionService';
 import weatherService from '../services/weatherService';
+import authService from '../services/authService';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation, onLogout }) => {
   const { theme } = useTheme();
-  const [user, setUser] = useState({ name: 'Fashion Lover' });
+  const [user, setUser] = useState({ name: 'User' });
   const [wardrobeStats, setWardrobeStats] = useState({
     totalItems: 0,
     recentlyAdded: 0,
@@ -165,7 +166,31 @@ const HomeScreen = ({ navigation, onLogout }) => {
     }
   };
 
+  const loadUserData = async () => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        setUser({
+          name: currentUser.name || currentUser.username || 'User',
+          email: currentUser.email
+        });
+      } else {
+        // Try to load from storage
+        const authResult = await authService.loadUserFromStorage();
+        if (authResult.success && authResult.user) {
+          setUser({
+            name: authResult.user.name || authResult.user.username || 'User',
+            email: authResult.user.email
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
   useEffect(() => {
+    loadUserData();
     checkConnection();
     loadWardrobeStats();
     requestLocationPermission();
