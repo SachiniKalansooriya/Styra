@@ -1,30 +1,45 @@
 import apiService from './apiService';
 
 class WeatherService {
-  // Get current weather
-  async getCurrentWeather(location = null) {
+  // Get current weather by coordinates
+  async getCurrentWeather(latitude, longitude) {
     try {
-      const params = location ? { location } : {};
-      return await apiService.get('/weather/current', params);
+      return await apiService.get(`/api/weather/${latitude}/${longitude}`);
     } catch (error) {
       throw new Error(`Failed to get current weather: ${error.message}`);
     }
   }
 
-  // Get weather forecast
-  async getWeatherForecast(location = null, days = 5) {
+  // Get current weather by location object
+  async getCurrentWeatherByLocation(location) {
     try {
-      const params = { days, ...(location && { location }) };
-      return await apiService.get('/weather/forecast', params);
+      if (location && location.latitude && location.longitude) {
+        return await this.getCurrentWeather(location.latitude, location.longitude);
+      } else {
+        throw new Error('Location coordinates are required');
+      }
+    } catch (error) {
+      throw new Error(`Failed to get current weather: ${error.message}`);
+    }
+  }
+
+  // Get weather forecast (placeholder for future implementation)
+  async getWeatherForecast(latitude, longitude, days = 5) {
+    try {
+      // For now, just get current weather
+      // TODO: Implement forecast endpoint in backend
+      return await this.getCurrentWeather(latitude, longitude);
     } catch (error) {
       throw new Error(`Failed to get weather forecast: ${error.message}`);
     }
   }
 
-  // Get weather-based outfit suggestions
+  // Get weather-based outfit suggestions (placeholder)
   async getWeatherBasedOutfits(weatherData) {
     try {
-      return await apiService.post('/weather/outfit-suggestions', weatherData);
+      // This would be handled by the outfit recommendation endpoint
+      // that already includes weather data
+      return await apiService.post('/api/outfit/ai-recommendation', weatherData);
     } catch (error) {
       throw new Error(`Failed to get weather-based outfits: ${error.message}`);
     }

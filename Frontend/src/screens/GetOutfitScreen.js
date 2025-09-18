@@ -16,6 +16,7 @@ import * as Location from 'expo-location';
 import apiService from '../services/apiService';
 import outfitHistoryService from '../services/outfitHistoryService';
 import favoriteOutfitService from '../services/favoriteOutfitService';
+import weatherService from '../services/weatherService';
 
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
@@ -34,13 +35,14 @@ const GetOutfitScreen = ({ navigation }) => {
     { id: 'date', name: 'Date Night', icon: 'heart' },
   ];
 
-  // Mock weather data - replace with actual weather API
-  const mockWeatherData = {
-    temperature: 22,
-    condition: 'sunny',
-    description: 'Sunny',
-    humidity: 45,
-    windSpeed: 15,
+  // Loading weather data
+  const defaultWeatherData = {
+    temperature: null,
+    condition: 'loading',
+    description: 'Loading weather...',
+    humidity: null,
+    windSpeed: null,
+    location: 'Getting location...'
   };
 
   // Mock outfit data
@@ -101,7 +103,7 @@ const GetOutfitScreen = ({ navigation }) => {
     requestLocationPermission();
     // Set immediate fallback outfit for testing
     setCurrentOutfit(mockOutfits.casual);
-    setWeatherInfo(mockWeatherData);
+    // Weather will be loaded when location is obtained
     // Then try to get real outfit
     generateOutfit();
   }, []);
@@ -110,37 +112,142 @@ const GetOutfitScreen = ({ navigation }) => {
     generateOutfit();
   }, [occasion]);
 
+  useEffect(() => {
+    if (location) {
+      fetchWeatherInfo();
+    }
+  }, [location]);
+
   const requestLocationPermission = async () => {
     try {
+      console.log('Requesting location permission and GPS coordinates...');
+      
+      // Request location permission
       let { status } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(status);
       
       if (status === 'granted') {
-        let locationData = await Location.getCurrentPositionAsync({});
+        console.log('Location permission granted, getting GPS coordinates...');
+        
+        // Use high accuracy location settings with extended timeout
+        let locationData = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation, // Highest accuracy
+          timeout: 25000, // 25 seconds timeout for better GPS lock
+          maximumAge: 5000, // Don't use cached data older than 5 seconds
+        });
+
+        console.log('GPS coordinates obtained:', {
+          latitude: locationData.coords.latitude,
+          longitude: locationData.coords.longitude,
+          accuracy: locationData.coords.accuracy + 'm',
+          timestamp: new Date(locationData.timestamp).toLocaleString()
+        });
+
+        // Try multiple readings for better accuracy if the first one is poor
+        if (locationData.coords.accuracy > 100) { // If accuracy is poor (>100m)
+          console.log('GPS accuracy is poor, attempting second reading...');
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+          
+          try {
+            let betterLocation = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.BestForNavigation,
+              timeout: 20000,
+              maximumAge: 1000,
+            });
+            
+            if (betterLocation.coords.accuracy < locationData.coords.accuracy) {
+              locationData = betterLocation;
+              console.log('Used improved GPS reading with accuracy:', betterLocation.coords.accuracy + 'm');
+            }
+          } catch (error) {
+            console.log('Second GPS reading failed, using first reading');
+          }
+        }
+
         setLocation({
           latitude: locationData.coords.latitude,
           longitude: locationData.coords.longitude,
         });
+
       } else {
-        // Use default location if permission denied
+        console.log('Location permission denied, using fallback location for Galle');
+        // Use Galle coordinates as fallback
         setLocation({
-          latitude: 37.7749, // San Francisco default
-          longitude: -122.4194,
+          latitude: 6.0535, // Galle, Sri Lanka
+          longitude: 80.2210,
         });
+        
+        Alert.alert(
+          'Location Access Denied',
+          'Location permission is required for accurate weather-based outfit recommendations. Using Galle as default location.',
+          [
+            { text: 'OK' },
+            { 
+              text: 'Enable Location', 
+              onPress: () => {
+                // Try to request permission again
+                requestLocationPermission();
+              }
+            }
+          ]
+        );
       }
     } catch (error) {
-      console.error('Error requesting location permission:', error);
-      // Fallback to default location
+      console.error('Error with GPS location:', error);
+      // Fallback to Galle coordinates
       setLocation({
-        latitude: 37.7749,
-        longitude: -122.4194,
+        latitude: 6.0535, // Galle, Sri Lanka
+        longitude: 80.2210,
       });
+      
+      Alert.alert(
+        'GPS Error',
+        'Unable to get your GPS location. Using Galle as default for outfit recommendations.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
-  const fetchWeatherInfo = () => {
-    // In a real app, you'd fetch from a weather API
-    setWeatherInfo(mockWeatherData);
+  const fetchWeatherInfo = async () => {
+    if (location && location.latitude && location.longitude) {
+      try {
+        const weatherData = await weatherService.getCurrentWeather(
+          location.latitude, 
+          location.longitude
+        );
+        
+        if (weatherData.status === 'success' && weatherData.current) {
+          // Try to get accurate city name using reverse geocoding
+          let cityName = null;
+          try {
+            cityName = await getAccurateCityName(location.latitude, location.longitude);
+          } catch (error) {
+            console.log('Reverse geocoding failed, using coordinate-based detection');
+            cityName = getCityNameFromCoordinates(location.latitude, location.longitude);
+          }
+          
+          setWeatherInfo({
+            temperature: weatherData.current.temperature,
+            condition: weatherData.current.condition,
+            humidity: weatherData.current.humidity,
+            windSpeed: weatherData.current.windSpeed,
+            precipitation: weatherData.current.precipitation,
+            location: cityName || weatherData.current.location?.name || 'Current Location',
+            icon: weatherData.current.icon,
+          });
+        } else {
+          // Fallback to loading state if API fails
+          setWeatherInfo(defaultWeatherData);
+        }
+      } catch (error) {
+        console.error('Error fetching weather:', error);
+        // Fallback to loading state if API fails
+        setWeatherInfo(defaultWeatherData);
+      }
+    } else {
+      // Use loading state if no location available
+      setWeatherInfo(defaultWeatherData);
+    }
   };
 
 // Update the generateOutfit function in your GetOutfitScreen.js
@@ -172,7 +279,13 @@ const generateOutfit = async () => {
     if (data.status === 'success' && data.outfit && !data.outfit.error) {
       console.log('Setting outfit from API:', data.outfit);
       setCurrentOutfit(data.outfit);
-      setWeatherInfo(data.weather);
+      
+      // Fix weather data location to be a string instead of object
+      const weatherData = {
+        ...data.weather,
+        location: data.weather?.location?.name || data.weather?.location || 'Current Location'
+      };
+      setWeatherInfo(weatherData);
     } else {
       // Handle case where user has no wardrobe items
       if (data.outfit?.error) {
@@ -184,7 +297,7 @@ const generateOutfit = async () => {
             { text: 'Add Clothes', onPress: () => navigation.navigate('AddClothes') },
             { text: 'Use Demo Outfit', onPress: () => {
               setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
-              setWeatherInfo(mockWeatherData);
+              // Keep current weather info (don't override with mock data)
             }},
             { text: 'OK', style: 'cancel' }
           ]
@@ -192,7 +305,7 @@ const generateOutfit = async () => {
       } else {
         console.log('No outfit data available, using fallback');
         setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
-        setWeatherInfo(mockWeatherData);
+        // Keep current weather info (don't override with mock data)
       }
     }
   } catch (error) {
@@ -201,7 +314,7 @@ const generateOutfit = async () => {
     
     // Always show fallback instead of alert for now
     setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
-    setWeatherInfo(mockWeatherData);
+    // Keep current weather info (don't override with mock data)
     
     // Optional: show alert only if you want to notify user
     // Alert.alert(
@@ -211,6 +324,134 @@ const generateOutfit = async () => {
     // );
   } finally {
     setLoading(false);
+  }
+};
+
+const getWeatherIcon = (condition) => {
+  if (!condition) return 'help-circle-outline';
+  
+  const conditionLower = String(condition).toLowerCase();
+  if (conditionLower.includes('sun') || conditionLower.includes('clear')) {
+    return 'sunny';
+  } else if (conditionLower.includes('cloud') || conditionLower.includes('overcast')) {
+    return 'cloudy';
+  } else if (conditionLower.includes('rain') || conditionLower.includes('shower') || conditionLower.includes('drizzle')) {
+    return 'rainy';
+  } else if (conditionLower.includes('snow')) {
+    return 'snow';
+  } else if (conditionLower.includes('thunder') || conditionLower.includes('storm')) {
+    return 'thunderstorm';
+  } else if (conditionLower.includes('fog') || conditionLower.includes('mist')) {
+    return 'cloud';
+  } else if (conditionLower.includes('loading')) {
+    return 'hourglass-outline';
+  } else {
+    return 'partly-sunny';
+  }
+};
+
+const getCityNameFromCoordinates = (lat, lon) => {
+  // Define Sri Lankan cities with their approximate coordinates
+  const cities = [
+    { name: 'Galle', lat: 6.0535, lon: 80.2210, radius: 0.1 },
+    { name: 'Colombo', lat: 6.9271, lon: 79.8612, radius: 0.15 },
+    { name: 'Kandy', lat: 7.2966, lon: 80.6350, radius: 0.1 },
+    { name: 'Jaffna', lat: 9.6615, lon: 80.0255, radius: 0.1 },
+    { name: 'Negombo', lat: 7.2084, lon: 79.8380, radius: 0.08 },
+    { name: 'Matara', lat: 5.9549, lon: 80.5550, radius: 0.08 },
+    { name: 'Batticaloa', lat: 7.7102, lon: 81.6924, radius: 0.1 },
+    { name: 'Trincomalee', lat: 8.5874, lon: 81.2152, radius: 0.1 },
+    { name: 'Anuradhapura', lat: 8.3114, lon: 80.4037, radius: 0.1 },
+    { name: 'Polonnaruwa', lat: 7.9403, lon: 81.0188, radius: 0.1 },
+    { name: 'Ratnapura', lat: 6.6828, lon: 80.4034, radius: 0.1 },
+    { name: 'Badulla', lat: 6.9934, lon: 81.0550, radius: 0.1 },
+    { name: 'Kurunegala', lat: 7.4818, lon: 80.3609, radius: 0.1 },
+  ];
+
+  // Find the closest city within radius
+  for (const city of cities) {
+    const distance = Math.sqrt(
+      Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2)
+    );
+    if (distance <= city.radius) {
+      return city.name;
+    }
+  }
+
+  // If no exact match found, return null to use API location
+  return null;
+};
+
+const getAccurateCityName = async (latitude, longitude) => {
+  try {
+    console.log('Getting accurate city name for coordinates:', latitude, longitude);
+    
+    // Try OpenStreetMap Nominatim API (free reverse geocoding)
+    try {
+      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`;
+      
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          'User-Agent': 'StyraApp/1.0', // Required by Nominatim
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Nominatim reverse geocoding result:', data);
+        
+        if (data.address) {
+          // Try to get the most appropriate city/town name
+          const cityName = data.address.city || 
+                          data.address.town || 
+                          data.address.village || 
+                          data.address.suburb ||
+                          data.address.municipality ||
+                          data.address.county ||
+                          data.address.state_district;
+          
+          if (cityName) {
+            console.log('Found city via Nominatim:', cityName);
+            return cityName;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Nominatim API failed:', error.message);
+    }
+    
+    // Fallback to Expo Location reverse geocoding
+    try {
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (reverseGeocode && reverseGeocode.length > 0) {
+        const location = reverseGeocode[0];
+        console.log('Expo reverse geocoding result:', location);
+        
+        const cityName = location.city || 
+                        location.subregion || 
+                        location.district || 
+                        location.region || 
+                        location.name;
+        
+        if (cityName) {
+          console.log('Found city via Expo reverse geocoding:', cityName);
+          return cityName;
+        }
+      }
+    } catch (error) {
+      console.log('Expo reverse geocoding failed:', error.message);
+    }
+    
+    // Final fallback to coordinate-based detection
+    return getCityNameFromCoordinates(latitude, longitude);
+    
+  } catch (error) {
+    console.error('All reverse geocoding methods failed:', error);
+    return getCityNameFromCoordinates(latitude, longitude);
   }
 };
 
@@ -327,7 +568,7 @@ const handleLikeOutfit = async () => {
       const result = await outfitHistoryService.recordWornOutfit(
         outfitData,
         occasion,
-        weatherInfo?.condition || mockWeatherData.condition,
+        weatherInfo?.condition || defaultWeatherData.condition,
         location,
         new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
       );
@@ -386,7 +627,7 @@ const handleLikeOutfit = async () => {
                 occasion: occasion,
                 confidence: currentOutfit.confidence,
                 reason: currentOutfit.reason,
-                weather_context: weatherInfo || mockWeatherData
+                weather_context: weatherInfo || defaultWeatherData
               };
 
               const result = await favoriteOutfitService.saveFavorite(
@@ -460,12 +701,32 @@ const handleLikeOutfit = async () => {
   const renderWeatherCard = () => (
     <View style={styles.weatherCard}>
       <View style={styles.weatherInfo}>
-        <Ionicons name="sunny" size={24} color="#FFD700" />
-        <Text style={styles.temperature}>{weatherInfo?.temperature}°C</Text>
-        <Text style={styles.weatherDescription}>{weatherInfo?.description}</Text>
+        <Ionicons 
+          name={getWeatherIcon(weatherInfo?.condition)} 
+          size={24} 
+          color="#FFD700" 
+        />
+        <Text style={styles.temperature}>
+          {weatherInfo?.temperature ? `${weatherInfo.temperature}°C` : 'Loading...'}
+        </Text>
+        <Text style={styles.weatherDescription}>
+          {weatherInfo?.description || 'Loading weather...'}
+        </Text>
+        <TouchableOpacity 
+          style={styles.weatherRefreshButton} 
+          onPress={() => {
+            console.log('Refreshing GPS location and weather...');
+            requestLocationPermission();
+          }}
+        >
+          <Ionicons name="refresh" size={16} color="#666" />
+        </TouchableOpacity>
       </View>
       <Text style={styles.weatherDetails}>
-        Humidity: {weatherInfo?.humidity}% • Wind: {weatherInfo?.windSpeed} km/h
+        {weatherInfo?.location && (
+          <>📍 {weatherInfo.location} • </>
+        )}
+        {weatherInfo?.humidity ? `Humidity: ${weatherInfo.humidity}%` : 'Loading humidity...'} • {weatherInfo?.windSpeed ? `Wind: ${weatherInfo.windSpeed} km/h` : 'Loading wind...'}
       </Text>
     </View>
   );
@@ -653,6 +914,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    position: 'relative',
+  },
+  weatherRefreshButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 5,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 15,
   },
   temperature: {
     fontSize: 24,
@@ -664,6 +933,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginLeft: 10,
+    flex: 1,
   },
   weatherDetails: {
     fontSize: 14,

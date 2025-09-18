@@ -17,6 +17,7 @@ from services.outfit_history_service import OutfitHistoryService
 from services.trip_ai_generator import trip_ai_generator
 from services.enhanced_outfit_service import enhanced_outfit_service
 from services.favorite_outfit_service import favorite_outfit_service
+from services.weather_service import weather_service
 from datetime import datetime
 import json
 import glob
@@ -501,19 +502,27 @@ async def get_ai_outfit_recommendation(request_data: dict):
         location = request_data.get('location', {})
         occasion = request_data.get('occasion', 'casual')
         
-        # Create mock weather data if no location provided
+        # Get real weather data if location is provided
         if location.get('latitude') and location.get('longitude'):
-            # Use real weather data (would need weather service integration)
-            weather_data = {
-                'temperature': 22,
-                'condition': 'partly cloudy',
-                'humidity': 55,
-                'windSpeed': 12,
-                'precipitation': 0,
-                'location': f"Lat: {location['latitude']}, Lon: {location['longitude']}"
-            }
+            try:
+                weather_data = weather_service.get_current_weather(
+                    location['latitude'], 
+                    location['longitude']
+                )
+                logger.info(f"Retrieved real weather data: {weather_data}")
+            except Exception as e:
+                logger.warning(f"Failed to get real weather data: {e}")
+                # Fallback to default weather if API fails
+                weather_data = {
+                    'temperature': 22,
+                    'condition': 'partly cloudy',
+                    'humidity': 55,
+                    'windSpeed': 12,
+                    'precipitation': 0,
+                    'location': f"Lat: {location['latitude']}, Lon: {location['longitude']}"
+                }
         else:
-            # Use default weather
+            # Use default weather when no location provided
             weather_data = {
                 'temperature': 22,
                 'condition': 'partly cloudy',
@@ -790,36 +799,14 @@ async def save_trip(trip_data: dict):
 # Weather Integration (Mock for now - can be enhanced with real weather API)
 @app.get("/api/weather/{lat}/{lon}")
 async def get_weather_data(lat: float, lon: float):
-    """Get weather data for coordinates (mock implementation)"""
+    """Get weather data for coordinates"""
     try:
-        # Mock weather data - replace with real weather API
-        mock_weather = {
-            "current": {
-                "temperature": 22,
-                "condition": "partly cloudy",
-                "humidity": 55,
-                "windSpeed": 12,
-                "precipitation": 0,
-                "location": f"Lat: {lat}, Lon: {lon}",
-                "timestamp": datetime.now().isoformat()
-            },
-            "forecast": [
-                {
-                    "date": "2024-01-01",
-                    "temperature": 20,
-                    "condition": "sunny"
-                },
-                {
-                    "date": "2024-01-02", 
-                    "temperature": 18,
-                    "condition": "cloudy"
-                }
-            ]
-        }
+        # Use the real weather service
+        weather_data = weather_service.get_current_weather(lat, lon)
         
         return {
             "status": "success",
-            **mock_weather
+            "current": weather_data
         }
         
     except Exception as e:

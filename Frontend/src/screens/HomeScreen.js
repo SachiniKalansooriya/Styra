@@ -13,9 +13,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useTheme } from '../themes/ThemeProvider';
 import wardrobeService from '../services/wardrobeService';
 import connectionService from '../services/connectionService';
+import weatherService from '../services/weatherService';
 
 const { width } = Dimensions.get('window');
 
@@ -28,11 +30,15 @@ const HomeScreen = ({ navigation }) => {
     mostWornCategory: 'tops'
   });
   const [todayWeather, setTodayWeather] = useState({
-    temperature: 24,
-    condition: 'sunny',
-    description: 'Sunny'
+    temperature: null,
+    condition: null,
+    description: 'Loading weather...',
+    humidity: null,
+    location: 'Getting location...'
   });
   const [backendConnected, setBackendConnected] = useState(false);
+  const [location, setLocation] = useState(null);
+  const [locationPermission, setLocationPermission] = useState(null);
 
   const handleGetOutfit = async () => {
     try {
@@ -162,8 +168,14 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     checkConnection();
     loadWardrobeStats();
-    loadTodayWeather();
+    requestLocationPermission();
   }, []);
+
+  useEffect(() => {
+    if (location) {
+      loadTodayWeather();
+    }
+  }, [location]);
 
   const checkConnection = async () => {
     try {
@@ -205,31 +217,286 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const loadTodayWeather = () => {
-    const conditions = [
-      { temp: 24, condition: 'sunny', desc: 'Sunny' },
-      { temp: 18, condition: 'cloudy', desc: 'Cloudy' },
-      { temp: 15, condition: 'rainy', desc: 'Light Rain' }
+  const getCityNameFromCoordinates = (lat, lon) => {
+    // Define Sri Lankan cities with their approximate coordinates and smaller radius for accuracy
+    const cities = [
+      { name: 'Galle', lat: 6.0535, lon: 80.2210, radius: 0.05 }, // ~5.5km radius
+      { name: 'Colombo', lat: 6.9271, lon: 79.8612, radius: 0.08 }, // Larger radius for metro area
+      { name: 'Kandy', lat: 7.2966, lon: 80.6350, radius: 0.05 },
+      { name: 'Jaffna', lat: 9.6615, lon: 80.0255, radius: 0.05 },
+      { name: 'Negombo', lat: 7.2084, lon: 79.8380, radius: 0.04 },
+      { name: 'Matara', lat: 5.9549, lon: 80.5550, radius: 0.04 },
+      { name: 'Batticaloa', lat: 7.7102, lon: 81.6924, radius: 0.05 },
+      { name: 'Trincomalee', lat: 8.5874, lon: 81.2152, radius: 0.05 },
+      { name: 'Anuradhapura', lat: 8.3114, lon: 80.4037, radius: 0.05 },
+      { name: 'Polonnaruwa', lat: 7.9403, lon: 81.0188, radius: 0.05 },
+      { name: 'Ratnapura', lat: 6.6828, lon: 80.4034, radius: 0.05 },
+      { name: 'Badulla', lat: 6.9934, lon: 81.0550, radius: 0.05 },
+      { name: 'Kurunegala', lat: 7.4818, lon: 80.3609, radius: 0.05 },
+      // Add more suburbs/towns around Galle for better detection
+      { name: 'Unawatuna', lat: 6.0100, lon: 80.2500, radius: 0.02 },
+      { name: 'Hikkaduwa', lat: 6.1410, lon: 80.1019, radius: 0.02 },
+      { name: 'Bentota', lat: 6.4200, lon: 79.9956, radius: 0.02 },
+      { name: 'Mirissa', lat: 5.9486, lon: 80.4572, radius: 0.02 },
+      { name: 'Weligama', lat: 5.9748, lon: 80.4295, radius: 0.02 },
     ];
-    
-    const today = conditions[0];
-    setTodayWeather({
-      temperature: today.temp,
-      condition: today.condition,
-      description: today.desc
-    });
+
+    // Sort by distance and return the closest city within radius
+    const cityDistances = cities.map(city => ({
+      ...city,
+      distance: Math.sqrt(
+        Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2)
+      )
+    }));
+
+    // Sort by distance (closest first)
+    cityDistances.sort((a, b) => a.distance - b.distance);
+
+    // Return the closest city if it's within its radius
+    const closestCity = cityDistances[0];
+    if (closestCity && closestCity.distance <= closestCity.radius) {
+      console.log(`Detected city: ${closestCity.name} (distance: ${(closestCity.distance * 111).toFixed(1)}km)`);
+      return closestCity.name;
+    }
+
+    console.log('No city detected within radius, closest was:', closestCity?.name, 'at', (closestCity?.distance * 111).toFixed(1), 'km');
+    return null;
   };
 
-  const getWeatherIcon = (condition) => {
-    switch (condition) {
-      case 'sunny': return 'sunny';
-      case 'cloudy': return 'cloudy';
-      case 'rainy': return 'rainy';
-      default: return 'partly-sunny';
+  const getAccurateCityName = async (latitude, longitude) => {
+    try {
+      console.log('Getting accurate city name for coordinates:', latitude, longitude);
+      
+      // Try OpenStreetMap Nominatim API (free reverse geocoding)
+      try {
+        const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`;
+        
+        const response = await fetch(nominatimUrl, {
+          headers: {
+            'User-Agent': 'StyraApp/1.0', // Required by Nominatim
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Nominatim reverse geocoding result:', data);
+          
+          if (data.address) {
+            // Try to get the most appropriate city/town name
+            const cityName = data.address.city || 
+                            data.address.town || 
+                            data.address.village || 
+                            data.address.suburb ||
+                            data.address.municipality ||
+                            data.address.county ||
+                            data.address.state_district;
+            
+            if (cityName) {
+              console.log('Found city via Nominatim:', cityName);
+              return cityName;
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Nominatim API failed:', error.message);
+      }
+      
+      // Fallback to Expo Location reverse geocoding
+      try {
+        const reverseGeocode = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude,
+        });
+
+        if (reverseGeocode && reverseGeocode.length > 0) {
+          const location = reverseGeocode[0];
+          console.log('Expo reverse geocoding result:', location);
+          
+          const cityName = location.city || 
+                          location.subregion || 
+                          location.district || 
+                          location.region || 
+                          location.name;
+          
+          if (cityName) {
+            console.log('Found city via Expo reverse geocoding:', cityName);
+            return cityName;
+          }
+        }
+      } catch (error) {
+        console.log('Expo reverse geocoding failed:', error.message);
+      }
+      
+      // Final fallback to coordinate-based detection
+      return getCityNameFromCoordinates(latitude, longitude);
+      
+    } catch (error) {
+      console.error('All reverse geocoding methods failed:', error);
+      return getCityNameFromCoordinates(latitude, longitude);
+    }
+  };
+
+  const loadTodayWeather = async () => {
+    if (location && location.latitude && location.longitude) {
+      try {
+        console.log('Loading real weather data for location:', location);
+        const weatherData = await weatherService.getCurrentWeather(
+          location.latitude, 
+          location.longitude
+        );
+        
+        if (weatherData.status === 'success' && weatherData.current) {
+          // Try to get accurate city name using reverse geocoding
+          let cityName = null;
+          try {
+            cityName = await getAccurateCityName(location.latitude, location.longitude);
+          } catch (error) {
+            console.log('Reverse geocoding failed, using coordinate-based detection');
+            cityName = getCityNameFromCoordinates(location.latitude, location.longitude);
+          }
+          
+          setTodayWeather({
+            temperature: weatherData.current.temperature,
+            condition: weatherData.current.condition ? weatherData.current.condition.toLowerCase() : 'unknown',
+            description: weatherData.current.condition || 'Weather data unavailable',
+            humidity: weatherData.current.humidity,
+            windSpeed: weatherData.current.windSpeed,
+            location: cityName || weatherData.current.location?.name || 'Current Location'
+          });
+          console.log('Real weather data loaded for', cityName || 'unknown location');
+        } else {
+          // Keep loading state if API fails
+          console.log('Weather API returned no data, keeping loading state');
+        }
+      } catch (error) {
+        console.error('Error loading real weather:', error);
+        // Keep loading state if API fails
+        console.log('Weather API failed, keeping loading state');
+      }
+    } else {
+      // Keep loading state if no location available
+      console.log('No location available, keeping loading state');
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    try {
+      console.log('Requesting location permission and GPS coordinates...');
+      
+      // Request location permission
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(status);
+      
+      if (status === 'granted') {
+        console.log('Location permission granted, getting GPS coordinates...');
+        
+        // Use high accuracy location settings with extended timeout
+        let locationData = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation, // Highest accuracy
+          timeout: 25000, // 25 seconds timeout for better GPS lock
+          maximumAge: 5000, // Don't use cached data older than 5 seconds
+        });
+
+        console.log('GPS coordinates obtained:', {
+          latitude: locationData.coords.latitude,
+          longitude: locationData.coords.longitude,
+          accuracy: locationData.coords.accuracy + 'm',
+          timestamp: new Date(locationData.timestamp).toLocaleString()
+        });
+
+        // Try multiple readings for better accuracy if the first one is poor
+        if (locationData.coords.accuracy > 100) { // If accuracy is poor (>100m)
+          console.log('GPS accuracy is poor, attempting second reading...');
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+          
+          try {
+            let betterLocation = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.BestForNavigation,
+              timeout: 20000,
+              maximumAge: 1000,
+            });
+            
+            if (betterLocation.coords.accuracy < locationData.coords.accuracy) {
+              locationData = betterLocation;
+              console.log('Used improved GPS reading with accuracy:', betterLocation.coords.accuracy + 'm');
+            }
+          } catch (error) {
+            console.log('Second GPS reading failed, using first reading');
+          }
+        }
+
+        setLocation({
+          latitude: locationData.coords.latitude,
+          longitude: locationData.coords.longitude,
+        });
+
+      } else {
+        console.log('Location permission denied, using fallback location for Galle');
+        // Use Galle coordinates as fallback
+        setLocation({
+          latitude: 6.0535, // Galle, Sri Lanka
+          longitude: 80.2210,
+        });
+        
+        Alert.alert(
+          'Location Access Denied',
+          'Location permission is required for accurate weather. Using Galle as default location.',
+          [
+            { text: 'OK' },
+            { 
+              text: 'Enable Location', 
+              onPress: () => {
+                // Try to request permission again
+                requestLocationPermission();
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error with GPS location:', error);
+      // Fallback to Galle coordinates
+      setLocation({
+        latitude: 6.0535, // Galle, Sri Lanka
+        longitude: 80.2210,
+      });
+      
+      Alert.alert(
+        'GPS Error',
+        'Unable to get your GPS location. Using Galle as default.',
+        [{ text: 'OK' }]
+      );
+    }
+  };  const getWeatherIcon = (condition) => {
+    if (!condition) return 'help-circle-outline';
+    
+    const conditionLower = String(condition).toLowerCase();
+    if (conditionLower.includes('sun') || conditionLower.includes('clear')) {
+      return 'sunny';
+    } else if (conditionLower.includes('cloud') || conditionLower.includes('overcast')) {
+      return 'cloudy';
+    } else if (conditionLower.includes('rain') || conditionLower.includes('shower') || conditionLower.includes('drizzle')) {
+      return 'rainy';
+    } else if (conditionLower.includes('snow')) {
+      return 'snow';
+    } else if (conditionLower.includes('thunder') || conditionLower.includes('storm')) {
+      return 'thunderstorm';
+    } else if (conditionLower.includes('fog') || conditionLower.includes('mist')) {
+      return 'cloudy';
+    } else if (conditionLower.includes('partly')) {
+      return 'partly-sunny';
+    } else if (conditionLower.includes('loading')) {
+      return 'hourglass-outline';
+    } else {
+      return 'partly-sunny';
     }
   };
 
   const getWeatherOutfitSuggestion = () => {
+    if (!todayWeather.temperature) {
+      return 'Loading weather-based suggestions...';
+    }
+    
     if (todayWeather.temperature > 25) {
       return 'Light, breathable fabrics recommended';
     } else if (todayWeather.temperature < 15) {
@@ -357,16 +624,35 @@ const HomeScreen = ({ navigation }) => {
             >
               <View style={styles.weatherContent}>
                 <View style={styles.weatherLeft}>
-                  <Text style={styles.weatherTemp}>{todayWeather.temperature}°C</Text>
+                  <Text style={styles.weatherTemp}>
+                    {todayWeather.temperature ? `${todayWeather.temperature}°C` : 'Loading...'}
+                  </Text>
                   <Text style={styles.weatherDesc}>{todayWeather.description}</Text>
+                  {todayWeather.location && (
+                    <Text style={styles.weatherLocation}>{todayWeather.location}</Text>
+                  )}
                   <Text style={styles.weatherSuggestion}>{getWeatherOutfitSuggestion()}</Text>
                 </View>
                 <View style={styles.weatherRight}>
-                  <Ionicons 
-                    name={getWeatherIcon(todayWeather.condition)} 
-                    size={60} 
-                    color="#fff" 
-                  />
+                  <View style={styles.weatherIconContainer}>
+                    <Ionicons 
+                      name={getWeatherIcon(todayWeather.condition)} 
+                      size={60} 
+                      color="#fff" 
+                    />
+                    <TouchableOpacity 
+                      style={styles.refreshButton} 
+                      onPress={() => {
+                        console.log('Refreshing GPS location and weather...');
+                        requestLocationPermission();
+                      }}
+                    >
+                      <Ionicons name="refresh" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                  {todayWeather.humidity && (
+                    <Text style={styles.weatherHumidity}>{todayWeather.humidity}% humidity</Text>
+                  )}
                 </View>
               </View>
             </LinearGradient>
@@ -607,6 +893,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 5,
   },
+  weatherLocation: {
+    fontSize: 12,
+    color: '#fff',
+    opacity: 0.8,
+    marginBottom: 5,
+  },
   weatherSuggestion: {
     fontSize: 14,
     color: '#fff',
@@ -615,6 +907,25 @@ const styles = StyleSheet.create({
   weatherRight: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  weatherIconContainer: {
+    alignItems: 'center',
+    position: 'relative',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: -5,
+    right: -10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 15,
+    padding: 5,
+    marginTop: 5,
+  },
+  weatherHumidity: {
+    fontSize: 10,
+    color: '#fff',
+    opacity: 0.8,
+    marginTop: 5,
   },
   quickActionsContainer: {
     marginBottom: 25,
