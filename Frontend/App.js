@@ -9,6 +9,7 @@ import MyWardrobeScreen from './src/screens/MyWardrobeScreen';
 import GetOutfitScreen from './src/screens/GetOutfitScreen';
 import TripPlannerScreen from './src/screens/TripPlannerScreen';
 import AddClothesScreen from './src/screens/AddClothesScreen';
+import FavoriteOutfitsScreen from './src/screens/FavoriteOutfitsScreen';
 import connectionService from './src/services/connectionService';
 
 export default function App() {
@@ -74,6 +75,8 @@ export default function App() {
         return <GetOutfitScreen {...navigationProps} />;
       case 'TripPlanner':
         return <TripPlannerScreen {...navigationProps} />;
+      case 'FavoriteOutfits':
+        return <FavoriteOutfitsScreen {...navigationProps} />;
       default:
         return <LandingScreen {...navigationProps} />;
     }

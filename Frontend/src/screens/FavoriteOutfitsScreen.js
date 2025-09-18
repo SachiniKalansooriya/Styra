@@ -33,13 +33,16 @@ const FavoriteOutfitsScreen = ({ navigation }) => {
     loadFavorites();
     
     // Add a focus listener to reload data when the screen is focused
-    const unsubscribe = navigation.addListener('focus', () => {
-      console.log('FavoriteOutfits screen focused - reloading data');
-      loadFavorites();
-    });
-    
-    // Cleanup on unmount
-    return unsubscribe;
+    // Check if addListener exists (for React Navigation compatibility)
+    if (navigation.addListener) {
+      const unsubscribe = navigation.addListener('focus', () => {
+        console.log('FavoriteOutfits screen focused - reloading data');
+        loadFavorites();
+      });
+      
+      // Cleanup on unmount
+      return unsubscribe;
+    }
   }, [navigation]);
 
   const loadFavorites = async () => {
