@@ -405,7 +405,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
             <View style={styles.inputSection}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Item Name</Text>
               <TextInput
-                style={[styles.textInput, { borderColor: theme.primary, color: theme.text }]}
+                style={[styles.textInput, { borderColor: '#DCC9A7', color: theme.text }]}
                 placeholder="e.g., Blue Cotton T-Shirt"
                 placeholderTextColor="rgba(128,128,128,0.7)"
                 value={itemDetails.name}
@@ -423,10 +423,10 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
                       styles.categoryButton,
                       {
                         backgroundColor: itemDetails.category === cat.key 
-                          ? theme.primary 
+                          ? '#8A724C' 
                           : 'rgba(255,255,255,0.2)',
                         borderColor: itemDetails.category === cat.key 
-                          ? theme.primary 
+                          ? '#8A724C' 
                           : 'transparent',
                       }
                     ]}
@@ -454,7 +454,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
                       styles.colorButton,
                       {
                         backgroundColor: itemDetails.color === color 
-                          ? theme.primary 
+                          ? '#8A724C' 
                           : 'rgba(255,255,255,0.2)',
                         borderWidth: itemDetails.color === color ? 2 : 1,
                         borderColor: itemDetails.color === color 
@@ -485,7 +485,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
                       styles.seasonButton,
                       {
                         backgroundColor: itemDetails.season === season.key 
-                          ? theme.primary 
+                          ? '#8A724C' 
                           : 'rgba(255,255,255,0.2)',
                       }
                     ]}
@@ -512,7 +512,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
                       styles.seasonButton,
                       {
                         backgroundColor: itemDetails.occasion === occasion.key 
-                          ? theme.primary 
+                          ? '#8A724C' 
                           : 'rgba(255,255,255,0.2)',
                       }
                     ]}
@@ -533,14 +533,14 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
               style={[
                 styles.saveButton, 
                 { 
-                  backgroundColor: saving ? 'rgba(100,100,100,0.6)' : theme.primary,
+                  backgroundColor: saving ? 'rgba(100,100,100,0.6)' : '#DCC9A7',
                   opacity: saving ? 0.6 : 1
                 }
               ]}
               onPress={saveClothingItem}
               disabled={saving}
             >
-              <Text style={styles.saveButtonText}>
+              <Text style={[styles.saveButtonText, { color: '#000' }]}>
                 {saving ? 'Saving...' : 'Save to Wardrobe'}
               </Text>
             </TouchableOpacity>
