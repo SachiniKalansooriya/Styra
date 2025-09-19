@@ -498,7 +498,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Add Clothes',
       subtitle: 'Photo & AI analysis',
       icon: 'camera',
-      color: '#E74C3C',
+      color: '#8A724C',
       onPress: () => navigation.navigate('AddClothes')
     },
     {
@@ -506,7 +506,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Get Outfit',
       subtitle: 'AI styling assistant',
       icon: 'shirt',
-      color: '#3498DB',
+      color: '#B99668',
       onPress: () => handleGetOutfit()
     },
     {
@@ -514,7 +514,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'My Wardrobe',
       subtitle: `${wardrobeStats.totalItems} items`,
       icon: 'library',
-      color: '#9B59B6',
+       color: '#B99668',
       onPress: () => navigation.navigate('MyWardrobe')
     },
     {
@@ -522,7 +522,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Saved Trips',
       subtitle: 'Your trip history',
       icon: 'airplane',
-      color: '#1ABC9C',
+      color: '#8A724C',
       onPress: () => navigation.navigate('SavedTrips')
     },
     {
@@ -530,7 +530,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Favorites',
       subtitle: 'Saved outfits',
       icon: 'heart',
-      color: '#E91E63',
+      color: '#8A724C',
       onPress: () => {
         console.log('Navigating to FavoriteOutfits screen');
         navigation.navigate('FavoriteOutfits');
@@ -541,7 +541,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Worn Outfits',
       subtitle: 'Outfit history',
       icon: 'checkmark-circle',
-      color: '#4CAF50',
+      color: '#B99668',
       onPress: () => {
         console.log('Navigating to WornOutfits screen');
         navigation.navigate('WornOutfits');
@@ -555,8 +555,8 @@ const HomeScreen = ({ navigation, onLogout }) => {
       style={[styles.quickActionCard, { backgroundColor: action.color + '20' }]}
       onPress={action.onPress}
     >
-      <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}>
-        <Ionicons name={action.icon} size={24} color="white" />
+      <View style={styles.quickActionIcon}>
+        <Ionicons name={action.icon} size={24} color="#8A724C" />
       </View>
       <Text style={styles.quickActionTitle}>{action.title}</Text>
       <Text style={styles.quickActionSubtitle}>{action.subtitle}</Text>
@@ -564,7 +564,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: '#FFF1E6' }]}>
+    <View style={[styles.container, { backgroundColor: '#fff' }]}>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -582,7 +582,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
             >
               <View style={[
                 styles.connectionDot, 
-                { backgroundColor: backendConnected ? '#4CAF50' : '#FF5722' }
+                { backgroundColor: backendConnected ? '#F7F3E8' : '#F7F3E8' }
               ]} />
             </TouchableOpacity>
             
@@ -628,7 +628,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
         >
           {/* Weather Card */}
           <View style={styles.weatherCard}>
-            <View style={[styles.weatherGradient, { backgroundColor: '#FF6B6B' }]}>
+            <View style={[styles.weatherGradient, { backgroundColor: '#DCC9A7' }]}>
               <View style={styles.weatherContent}>
                 <View style={styles.weatherLeft}>
                   <Text style={styles.weatherTemp}>
@@ -718,7 +718,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
               style={styles.featureCard}
               onPress={() => navigation.navigate('TripPlanner')}
             >
-              <View style={[styles.featureGradient, { backgroundColor: '#FF9F43' }]}>
+              <View style={[styles.featureGradient, { backgroundColor: '#F7F3E8' }]}>
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
                     <Text style={styles.featureTitle}>Plan Your Trip</Text>
@@ -727,11 +727,11 @@ const HomeScreen = ({ navigation, onLogout }) => {
                     </Text>
                     <View style={styles.featureButton}>
                       <Text style={styles.featureButtonText}>Start Planning</Text>
-                      <Ionicons name="arrow-forward" size={16} color="#FF9F43" />
+                      <Ionicons name="arrow-forward" size={16} color="#8A724C" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>
-                    <Ionicons name="airplane" size={50} color="#fff" />
+                    <Ionicons name="airplane" size={50} color="#000" />
                   </View>
                 </View>
               </View>
@@ -742,7 +742,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
               style={styles.featureCard}
               onPress={() => navigation.navigate('BuyRecommendations')}
             >
-              <View style={[styles.featureGradient, { backgroundColor: '#6C5CE7' }]}>
+              <View style={[styles.featureGradient, { backgroundColor: '#F7F3E8' }]}>
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
                     <Text style={styles.featureTitle}>AI Shopping Assistant</Text>
@@ -751,11 +751,11 @@ const HomeScreen = ({ navigation, onLogout }) => {
                     </Text>
                     <View style={styles.featureButton}>
                       <Text style={styles.featureButtonText}>Shop Smart</Text>
-                      <Ionicons name="bag-add" size={16} color="#6C5CE7" />
+                      <Ionicons name="bag-add" size={16} color="#8A724C" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>
-                    <Ionicons name="bag-add" size={50} color="#fff" />
+                    <Ionicons name="bag-add" size={50} color="#000" />
                   </View>
                 </View>
               </View>
@@ -766,7 +766,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
               style={styles.featureCard}
               onPress={() => navigation.navigate('WornOutfits')}
             >
-              <View style={[styles.featureGradient, { backgroundColor: '#A29BFE' }]}>
+              <View style={[styles.featureGradient, { backgroundColor: '#F7F3E8' }]}>
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
                     <Text style={styles.featureTitle}>Worn Outfits</Text>
@@ -775,11 +775,11 @@ const HomeScreen = ({ navigation, onLogout }) => {
                     </Text>
                     <View style={styles.featureButton}>
                       <Text style={styles.featureButtonText}>View History</Text>
-                      <Ionicons name="checkmark-circle" size={16} color="#A29BFE" />
+                      <Ionicons name="checkmark-circle" size={16} color="#8A724C" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>
-                    <Ionicons name="calendar" size={50} color="#fff" />
+                    <Ionicons name="calendar" size={50} color="#000" />
                   </View>
                 </View>
               </View>
@@ -810,7 +810,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 16,
     opacity: 0.8,
-    color: '#666',
+    color: '#000',
   },
   userName: {
     fontSize: 24,
@@ -861,23 +861,23 @@ const styles = StyleSheet.create({
   weatherTemp: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#8A724C',
     marginBottom: 5,
   },
   weatherDesc: {
     fontSize: 18,
-    color: '#fff',
+    color: '#000',
     marginBottom: 5,
   },
   weatherLocation: {
     fontSize: 12,
-    color: '#fff',
+    color: '#000',
     opacity: 0.8,
     marginBottom: 5,
   },
   weatherSuggestion: {
     fontSize: 14,
-    color: '#fff',
+    color: '#000',
     opacity: 0.9,
   },
   weatherRight: {
@@ -931,6 +931,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    backgroundColor: 'white',
   },
   quickActionTitle: {
     fontSize: 16,
@@ -1024,12 +1025,12 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#8A724C',
     marginBottom: 8,
   },
   featureSubtitle: {
     fontSize: 14,
-    color: '#fff',
+    color: '#8A724C',
     opacity: 0.9,
     marginBottom: 15,
     lineHeight: 20,
@@ -1044,7 +1045,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   featureButtonText: {
-    color: '#000',
+    color: '#8A724C',
     fontSize: 14,
     fontWeight: '600',
     marginRight: 6,

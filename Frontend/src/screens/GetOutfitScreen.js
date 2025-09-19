@@ -809,7 +809,7 @@ const handleLikeOutfit = async () => {
               console.error('Error saving favorite:', error);
               Alert.alert(
                 'Error',
-                'Failed to save outfit as favorite. Please try again.',
+                'Failed to save outfit as favorite. Please try again.', 
                 [{ text: 'OK' }]
               );
             } finally {
@@ -1027,117 +1027,6 @@ const handleLikeOutfit = async () => {
     </View>
   );
 
-  const renderMultiOutfitView = () => {
-    if (!multiOutfits || !multiOutfits.recommendations) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="grid-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyTitle}>No Multi-Occasion Outfits</Text>
-          <Text style={styles.emptyText}>Tap the grid button to get outfit suggestions for all occasions</Text>
-          <TouchableOpacity style={styles.generateButton} onPress={generateMultiOutfits}>
-            <Text style={styles.generateButtonText}>Generate All Outfits</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    const occasions = [
-      { key: 'casual', name: 'Casual', icon: 'shirt-outline', color: '#4ECDC4' },
-      { key: 'work', name: 'Work', icon: 'briefcase-outline', color: '#FF6B6B' },
-      { key: 'formal', name: 'Formal', icon: 'business-outline', color: '#9B59B6' },
-      { key: 'workout', name: 'Workout', icon: 'fitness-outline', color: '#2ECC71' },
-      { key: 'datenight', name: 'Date Night', icon: 'heart-outline', color: '#E74C3C' }
-    ];
-
-    return (
-      <View style={styles.multiOutfitContainer}>
-        <Text style={styles.multiOutfitTitle}>Outfit Recommendations for All Occasions</Text>
-        
-        {multiOutfits.wardrobe_analysis && (
-          <View style={styles.analysisCard}>
-            <Text style={styles.analysisTitle}>Wardrobe Analysis</Text>
-            <Text style={styles.analysisText}>
-              {multiOutfits.wardrobe_analysis.total_items} items in your wardrobe
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.occasionGrid}>
-          {occasions.map((occasion) => {
-            const outfit = multiOutfits.recommendations[occasion.key];
-            const readiness = multiOutfits.wardrobe_analysis?.occasion_readiness?.[occasion.key];
-            
-            return (
-              <TouchableOpacity
-                key={occasion.key}
-                style={[styles.occasionCard, { borderColor: occasion.color }]}
-                onPress={() => {
-                  if (outfit && !outfit.error) {
-                    setCurrentOutfit(outfit);
-                    setOccasion(occasion.key);
-                    setShowMultiView(false);
-                  }
-                }}
-              >
-                <View style={[styles.occasionHeader, { backgroundColor: occasion.color }]}>
-                  <Ionicons name={occasion.icon} size={24} color="#fff" />
-                  <Text style={styles.occasionName}>{occasion.name}</Text>
-                </View>
-                
-                <View style={styles.occasionContent}>
-                  {outfit && !outfit.error ? (
-                    <>
-                      <View style={styles.confidenceRow}>
-                        <Text style={styles.confidenceLabel}>Match: {outfit.confidence}%</Text>
-                        <View style={[styles.statusBadge, { backgroundColor: 
-                          readiness?.status === 'excellent' ? '#2ECC71' :
-                          readiness?.status === 'good' ? '#F39C12' :
-                          readiness?.status === 'fair' ? '#E67E22' : '#E74C3C'
-                        }]}>
-                          <Text style={styles.statusText}>
-                            {readiness?.status || 'good'}
-                          </Text>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.outfitPreview}>
-                        {outfit.items && outfit.items.slice(0, 3).map((item, index) => (
-                          <View key={index} style={styles.previewItem}>
-                            <Image 
-                              source={{ 
-                                uri: item.image_path ? 
-                                  `http://172.20.10.7:8000${item.image_path}` : 
-                                  'https://via.placeholder.com/50'
-                              }} 
-                              style={styles.previewImage} 
-                            />
-                            <Text style={styles.previewItemText} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                      
-                      <Text style={styles.outfitReason} numberOfLines={2}>
-                        {outfit.reason}
-                      </Text>
-                    </>
-                  ) : (
-                    <View style={styles.errorContent}>
-                      <Ionicons name="alert-circle-outline" size={32} color="#E74C3C" />
-                      <Text style={styles.errorText}>
-                        {outfit?.message || 'No suitable items found'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1147,24 +1036,7 @@ const handleLikeOutfit = async () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Get Outfit</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={[styles.viewToggle, !showMultiView && styles.activeViewToggle]}
-            onPress={() => setShowMultiView(false)}
-          >
-            <Ionicons name="shirt-outline" size={16} color={!showMultiView ? "#fff" : "#FF8C42"} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.viewToggle, showMultiView && styles.activeViewToggle]}
-            onPress={() => {
-              if (!multiOutfits) {
-                generateMultiOutfits();
-              } else {
-                setShowMultiView(true);
-              }
-            }}
-          >
-            <Ionicons name="grid-outline" size={16} color={showMultiView ? "#fff" : "#FF8C42"} />
-          </TouchableOpacity>
+
           <TouchableOpacity onPress={showMultiView ? generateMultiOutfits : generateOutfit}>
             <Ionicons name="refresh" size={24} color="#DCC9A7" />
           </TouchableOpacity>
@@ -1471,7 +1343,7 @@ favoriteButton: {
 },
 likeButton: {
   flex: 1,
-  backgroundColor: '#e74c3c',
+  backgroundColor: '#B99668',
   flexDirection: 'row',
   justifyContent: 'center',
   alignItems: 'center',
