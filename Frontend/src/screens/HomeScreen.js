@@ -446,7 +446,9 @@ const HomeScreen = ({ navigation, onLogout }) => {
         [{ text: 'OK' }]
       );
     }
-  };  const getWeatherIcon = (condition) => {
+  };
+
+  const getWeatherIcon = (condition) => {
     if (!condition) return 'help-circle-outline';
     
     const conditionLower = String(condition).toLowerCase();
@@ -485,13 +487,18 @@ const HomeScreen = ({ navigation, onLogout }) => {
     }
   };
 
+  const getCityNameFromCoordinates = (latitude, longitude) => {
+    // Fallback function - you can implement this based on your needs
+    return 'Current Location';
+  };
+
   const quickActions = [
     {
       id: 'camera',
       title: 'Add Clothes',
       subtitle: 'Photo & AI analysis',
       icon: 'camera',
-      color: '#FF6B6B',
+      color: '#E74C3C',
       onPress: () => navigation.navigate('AddClothes')
     },
     {
@@ -499,7 +506,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Get Outfit',
       subtitle: 'AI styling assistant',
       icon: 'shirt',
-      color: '#4ECDC4',
+      color: '#3498DB',
       onPress: () => handleGetOutfit()
     },
     {
@@ -507,7 +514,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'My Wardrobe',
       subtitle: `${wardrobeStats.totalItems} items`,
       icon: 'library',
-      color: '#45B7D1',
+      color: '#9B59B6',
       onPress: () => navigation.navigate('MyWardrobe')
     },
     {
@@ -515,7 +522,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Saved Trips',
       subtitle: 'Your trip history',
       icon: 'airplane',
-      color: '#3498db',
+      color: '#1ABC9C',
       onPress: () => navigation.navigate('SavedTrips')
     },
     {
@@ -523,7 +530,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Favorites',
       subtitle: 'Saved outfits',
       icon: 'heart',
-      color: '#9b59b6',
+      color: '#E91E63',
       onPress: () => {
         console.log('Navigating to FavoriteOutfits screen');
         navigation.navigate('FavoriteOutfits');
@@ -534,7 +541,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
       title: 'Worn Outfits',
       subtitle: 'Outfit history',
       icon: 'checkmark-circle',
-      color: '#2ecc71',
+      color: '#4CAF50',
       onPress: () => {
         console.log('Navigating to WornOutfits screen');
         navigation.navigate('WornOutfits');
@@ -545,11 +552,11 @@ const HomeScreen = ({ navigation, onLogout }) => {
   const renderQuickAction = (action) => (
     <TouchableOpacity
       key={action.id}
-      style={[styles.quickActionCard, { backgroundColor: action.color + '15' }]}
+      style={[styles.quickActionCard, { backgroundColor: action.color + '20' }]}
       onPress={action.onPress}
     >
       <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}>
-        <Ionicons name={action.icon} size={24} color="#fff" />
+        <Ionicons name={action.icon} size={24} color="white" />
       </View>
       <Text style={styles.quickActionTitle}>{action.title}</Text>
       <Text style={styles.quickActionSubtitle}>{action.subtitle}</Text>
@@ -557,15 +564,15 @@ const HomeScreen = ({ navigation, onLogout }) => {
   );
 
   return (
-    <LinearGradient colors={theme.background} style={styles.container}>
+    <View style={[styles.container, { backgroundColor: '#FFF1E6' }]}>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.greeting, { color: theme.text }]}>
+            <Text style={styles.greeting}>
               Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}
             </Text>
-            <Text style={[styles.userName, { color: theme.text }]}>{user.name}</Text>
+            <Text style={styles.userName}>{user.name}</Text>
           </View>
           
           <View style={styles.headerActions}>
@@ -583,7 +590,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
               style={styles.notificationButton}
               onPress={() => Alert.alert('Notifications', 'No new notifications')}
             >
-              <Ionicons name="notifications-outline" size={24} color={theme.text} />
+              <Ionicons name="notifications-outline" size={24} color="#333" />
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -609,7 +616,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
                 );
               }}
             >
-              <Ionicons name="log-out-outline" size={24} color={theme.text} />
+              <Ionicons name="log-out-outline" size={24} color="#333" />
             </TouchableOpacity>
           </View>
         </View>
@@ -621,12 +628,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
         >
           {/* Weather Card */}
           <View style={styles.weatherCard}>
-            <LinearGradient
-              colors={['#FF8C42', '#FF6B6B']}
-              style={styles.weatherGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
+            <View style={[styles.weatherGradient, { backgroundColor: '#FF6B6B' }]}>
               <View style={styles.weatherContent}>
                 <View style={styles.weatherLeft}>
                   <Text style={styles.weatherTemp}>
@@ -660,12 +662,12 @@ const HomeScreen = ({ navigation, onLogout }) => {
                   )}
                 </View>
               </View>
-            </LinearGradient>
+            </View>
           </View>
 
           {/* Quick Actions Grid */}
           <View style={styles.quickActionsContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.quickActionsGrid}>
               {quickActions.map(renderQuickAction)}
             </View>
@@ -673,12 +675,12 @@ const HomeScreen = ({ navigation, onLogout }) => {
 
           {/* Wardrobe Insights */}
           <View style={styles.insightsContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Wardrobe Insights</Text>
+            <Text style={styles.sectionTitle}>Wardrobe Insights</Text>
             
             <View style={styles.insightsGrid}>
               <View style={[styles.insightCard, styles.insightCardLarge]}>
                 <View style={styles.insightHeader}>
-                  <Ionicons name="analytics" size={24} color="#FF8C42" />
+                  <Ionicons name="analytics" size={24} color="#FF6B6B" />
                   <Text style={styles.insightTitle}>Total Items</Text>
                 </View>
                 <Text style={styles.insightValue}>{wardrobeStats.totalItems}</Text>
@@ -689,7 +691,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
 
               <View style={styles.insightCard}>
                 <View style={styles.insightHeader}>
-                  <Ionicons name="trending-up" size={20} color="#4ECDC4" />
+                  <Ionicons name="trending-up" size={20} color="#3498DB" />
                   <Text style={styles.insightTitleSmall}>Most Worn</Text>
                 </View>
                 <Text style={styles.insightValueSmall}>{wardrobeStats.mostWornCategory}</Text>
@@ -697,7 +699,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
 
               <View style={styles.insightCard}>
                 <View style={styles.insightHeader}>
-                  <Ionicons name="time" size={20} color="#45B7D1" />
+                  <Ionicons name="time" size={20} color="#9B59B6" />
                   <Text style={styles.insightTitleSmall}>Last Added</Text>
                 </View>
                 <Text style={styles.insightValueSmall}>
@@ -709,19 +711,14 @@ const HomeScreen = ({ navigation, onLogout }) => {
 
           {/* Featured Cards */}
           <View style={styles.featuredContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Discover</Text>
+            <Text style={styles.sectionTitle}>Discover</Text>
             
             {/* Trip Planner Feature Card */}
             <TouchableOpacity 
               style={styles.featureCard}
               onPress={() => navigation.navigate('TripPlanner')}
             >
-              <LinearGradient
-                colors={['#667eea', '#764ba2']}
-                style={styles.featureGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
+              <View style={[styles.featureGradient, { backgroundColor: '#FF9F43' }]}>
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
                     <Text style={styles.featureTitle}>Plan Your Trip</Text>
@@ -730,14 +727,14 @@ const HomeScreen = ({ navigation, onLogout }) => {
                     </Text>
                     <View style={styles.featureButton}>
                       <Text style={styles.featureButtonText}>Start Planning</Text>
-                      <Ionicons name="arrow-forward" size={16} color="#fff" />
+                      <Ionicons name="arrow-forward" size={16} color="#FF9F43" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>
                     <Ionicons name="airplane" size={50} color="#fff" />
                   </View>
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             {/* AI Styling Feature Card */}
@@ -745,28 +742,23 @@ const HomeScreen = ({ navigation, onLogout }) => {
               style={styles.featureCard}
               onPress={() => navigation.navigate('BuyRecommendations')}
             >
-              <LinearGradient
-                colors={['#ffecd2', '#fcb69f']}
-                style={styles.featureGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
+              <View style={[styles.featureGradient, { backgroundColor: '#6C5CE7' }]}>
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
-                    <Text style={[styles.featureTitle, { color: '#8B4513' }]}>AI Shopping Assistant</Text>
-                    <Text style={[styles.featureSubtitle, { color: '#8B4513' }]}>
+                    <Text style={styles.featureTitle}>AI Shopping Assistant</Text>
+                    <Text style={styles.featureSubtitle}>
                       Get personalized buying recommendations
                     </Text>
-                    <View style={[styles.featureButton, { backgroundColor: '#8B4513' }]}>
+                    <View style={styles.featureButton}>
                       <Text style={styles.featureButtonText}>Shop Smart</Text>
-                      <Ionicons name="bag-add" size={16} color="#fff" />
+                      <Ionicons name="bag-add" size={16} color="#6C5CE7" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>
-                    <Ionicons name="bag-add" size={50} color="#8B4513" />
+                    <Ionicons name="bag-add" size={50} color="#fff" />
                   </View>
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             {/* Worn Outfits Feature Card */}
@@ -774,34 +766,29 @@ const HomeScreen = ({ navigation, onLogout }) => {
               style={styles.featureCard}
               onPress={() => navigation.navigate('WornOutfits')}
             >
-              <LinearGradient
-                colors={['#a8edea', '#fed6e3']}
-                style={styles.featureGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
+              <View style={[styles.featureGradient, { backgroundColor: '#A29BFE' }]}>
                 <View style={styles.featureContent}>
                   <View style={styles.featureLeft}>
-                    <Text style={[styles.featureTitle, { color: '#2D3436' }]}>Worn Outfits</Text>
-                    <Text style={[styles.featureSubtitle, { color: '#636E72' }]}>
+                    <Text style={styles.featureTitle}>Worn Outfits</Text>
+                    <Text style={styles.featureSubtitle}>
                       View your outfit history with dates
                     </Text>
-                    <View style={[styles.featureButton, { backgroundColor: '#2D3436' }]}>
+                    <View style={styles.featureButton}>
                       <Text style={styles.featureButtonText}>View History</Text>
-                      <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                      <Ionicons name="checkmark-circle" size={16} color="#A29BFE" />
                     </View>
                   </View>
                   <View style={styles.featureRight}>
-                    <Ionicons name="calendar" size={50} color="#2D3436" />
+                    <Ionicons name="calendar" size={50} color="#fff" />
                   </View>
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </View>
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
@@ -823,11 +810,13 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 16,
     opacity: 0.8,
+    color: '#666',
   },
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
     marginTop: 2,
+    color: '#000',
   },
   headerActions: {
     flexDirection: 'row',
@@ -903,7 +892,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -5,
     right: -10,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 15,
     padding: 5,
     marginTop: 5,
@@ -921,6 +910,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
+    color: '#000',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -945,7 +935,7 @@ const styles = StyleSheet.create({
   quickActionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000',
     marginBottom: 4,
     textAlign: 'center',
   },
@@ -963,7 +953,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   insightCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#D6CAB0',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -985,25 +975,25 @@ const styles = StyleSheet.create({
   insightTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#000',
     marginLeft: 8,
   },
   insightTitleSmall: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#000',
     marginLeft: 6,
   },
   insightValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FF8C42',
+    color: '#FF6B6B',
     marginBottom: 5,
   },
   insightValueSmall: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000',
     textTransform: 'capitalize',
   },
   insightSubtext: {
@@ -1020,6 +1010,7 @@ const styles = StyleSheet.create({
   },
   featureGradient: {
     padding: 20,
+    borderRadius: 16,
   },
   featureContent: {
     flexDirection: 'row',
@@ -1046,14 +1037,14 @@ const styles = StyleSheet.create({
   featureButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     alignSelf: 'flex-start',
   },
   featureButtonText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 14,
     fontWeight: '600',
     marginRight: 6,
@@ -1061,28 +1052,6 @@ const styles = StyleSheet.create({
   featureRight: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  debugContainer: {
-    marginBottom: 25,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    padding: 15,
-  },
-  debugButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  debugButton: {
-    backgroundColor: '#FF8C42',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.48,
-  },
-  debugButtonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: '600',
   },
   bottomSpacing: {
     height: 20,

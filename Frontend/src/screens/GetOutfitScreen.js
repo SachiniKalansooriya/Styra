@@ -899,8 +899,8 @@ const handleLikeOutfit = async () => {
           <Switch
             value={demoMode}
             onValueChange={setDemoMode}
-            trackColor={{ false: '#81b0ff', true: '#FF8C42' }}
-            thumbColor={demoMode ? '#fff' : '#f4f3f4'}
+            trackColor={{ false: '#81b0ff', true: '#8A724C' }}
+            thumbColor={demoMode ? '#fff' : '#B99668'}
           />
           <Text style={[styles.demoModeText, demoMode && styles.activeModeText]}>
             Demo Mode
@@ -1166,7 +1166,7 @@ const handleLikeOutfit = async () => {
             <Ionicons name="grid-outline" size={16} color={showMultiView ? "#fff" : "#FF8C42"} />
           </TouchableOpacity>
           <TouchableOpacity onPress={showMultiView ? generateMultiOutfits : generateOutfit}>
-            <Ionicons name="refresh" size={24} color="#FF8C42" />
+            <Ionicons name="refresh" size={24} color="#DCC9A7" />
           </TouchableOpacity>
         </View>
       </View>
@@ -1267,12 +1267,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   weatherCard: {
-    backgroundColor: '#f8f9ff',
+    backgroundColor: '#F7F3E8',
     margin: 20,
     padding: 15,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF8C42',
+    borderLeftColor: '#8A724C',
   },
   weatherInfo: {
     flexDirection: 'row',
@@ -1312,14 +1312,14 @@ const styles = StyleSheet.create({
   occasionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#F7F3E8',
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderRadius: 20,
     marginRight: 10,
   },
   selectedOccasionButton: {
-    backgroundColor: '#FF8C42',
+    backgroundColor: '#DCC9A7',
   },
   occasionButtonText: {
     color: '#666',
@@ -1328,7 +1328,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   selectedOccasionButtonText: {
-    color: '#fff',
+    color: 'black',
   },
   loadingContainer: {
     flex: 1,
@@ -1366,7 +1366,7 @@ const styles = StyleSheet.create({
   },
   confidenceFill: {
     height: '100%',
-    backgroundColor: '#FF8C42',
+    backgroundColor: '#B99668',
     borderRadius: 3,
   },
   itemsContainer: {
@@ -1380,7 +1380,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
     marginBottom: 10,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'white',
     borderRadius: 10,
   },
   itemDisplayContainer: {
@@ -1451,7 +1451,7 @@ buttonRow: {
 },
 dislikeButton: {
   flex: 1,
-  backgroundColor: '#666',
+  backgroundColor: '#B99668',
   flexDirection: 'row',
   justifyContent: 'center',
   alignItems: 'center',
@@ -1461,7 +1461,7 @@ dislikeButton: {
 },
 favoriteButton: {
   flex: 1,
-  backgroundColor: '#9b59b6',
+  backgroundColor: '#B99668',
   flexDirection: 'row',
   justifyContent: 'center',
   alignItems: 'center',
@@ -1481,7 +1481,7 @@ likeButton: {
 },
 wearButton: {
   flex: 1,
-  backgroundColor: '#27ae60',
+  backgroundColor: '#B99668',
   flexDirection: 'row',
   justifyContent: 'center',
   alignItems: 'center',
@@ -1516,7 +1516,7 @@ wearButton: {
     marginBottom: 24,
   },
   generateButton: {
-    backgroundColor: '#FF8C42',
+    backgroundColor: '#8A724C',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 25,
@@ -1527,7 +1527,7 @@ wearButton: {
     fontWeight: '600',
   },
   retryItemButton: {
-    backgroundColor: '#FF8C42',
+    backgroundColor: '#8A724C',
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderRadius: 20,
@@ -1563,7 +1563,7 @@ wearButton: {
   demoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#B99668',
   },
   demoToggle: {
     flexDirection: 'row',
@@ -1575,7 +1575,7 @@ wearButton: {
     marginHorizontal: 8,
   },
   activeModeText: {
-    color: '#FF8C42',
+    color: '#8A724C',
     fontWeight: '600',
   },
   demoInputs: {
@@ -1614,19 +1614,19 @@ wearButton: {
     backgroundColor: '#fff',
   },
   selectedConditionButton: {
-    backgroundColor: '#FF8C42',
-    borderColor: '#FF8C42',
+    backgroundColor: '#DCC9A7',
+    borderColor: '#B99668',
   },
   conditionText: {
     fontSize: 14,
-    color: '#666',
+    color: 'black',
   },
   selectedConditionText: {
-    color: '#fff',
+    color: 'black',
     fontWeight: '600',
   },
   demoGenerateButton: {
-    backgroundColor: '#FF8C42',
+    backgroundColor: '#DCC9A7',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -1634,7 +1634,7 @@ wearButton: {
     marginTop: 10,
   },
   demoGenerateButtonText: {
-    color: '#fff',
+    color: 'black',
     fontSize: 16,
     fontWeight: '600',
   },

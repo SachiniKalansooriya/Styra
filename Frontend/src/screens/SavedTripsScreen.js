@@ -196,20 +196,20 @@ const SavedTripsScreen = ({ navigation }) => {
         {/* Packing Statistics */}
         <View style={styles.packingStats}>
           <View style={styles.statItem}>
-            <Ionicons name="bag-outline" size={16} color="#007AFF" />
+            <Ionicons name="bag-outline" size={16} color="#8A724C" />
             <Text style={styles.statText}>
               {packingStats.totalItems} items
             </Text>
           </View>
           <View style={styles.statItem}>
-            <Ionicons name="grid-outline" size={16} color="#007AFF" />
+            <Ionicons name="grid-outline" size={16} color="#8A724C" />
             <Text style={styles.statText}>
               {packingStats.categories} categories
             </Text>
           </View>
           {item.packing_style && (
             <View style={styles.statItem}>
-              <Ionicons name="star-outline" size={16} color="#007AFF" />
+              <Ionicons name="star-outline" size={16} color="#8A724C" />
               <Text style={styles.statText}>
                 {item.packing_style}
               </Text>
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F3E8',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   tripCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F3E8',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   },
   dates: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#8A724C',
     marginBottom: 4,
   },
   activities: {
