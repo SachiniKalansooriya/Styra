@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     paddingTop: 25, // Extra padding for status bar
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F3E8',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   outfitCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F3E8',
     borderRadius: 12,
     padding: 15,
     marginBottom: 15,
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   outfitOccasion: {
     fontSize: 16,
-    color: '#FF8C42',
+    color: '#8A724C',
     fontWeight: '500',
   },
   outfitItemsContainer: {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   confidenceText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FF8C42',
+    color: '#8A724C',
   },
   emptyContainer: {
     flex: 1,
