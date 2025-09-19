@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     paddingTop: 50,
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F3E8',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   favoriteCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F3E8',
     borderRadius: 12,
     padding: 15,
     marginBottom: 15,
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
   confidenceText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FF8C42',
+    color: '#8A724C',
     marginBottom: 4,
   },
   wornText: {
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   },
   wearFavoriteButton: {
     flex: 1,
-    backgroundColor: '#27ae60',
+    backgroundColor: '#8A724C',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
