@@ -164,7 +164,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.text }]}>My Wardrobe</Text>
         <TouchableOpacity 
-          style={[styles.addButton, { backgroundColor: theme.primary }]}
+          style={[styles.addButton, { backgroundColor: '#8A724C' }]}
           onPress={() => navigation.navigate('AddClothes')}
         >
           <Text style={styles.addButtonText}>+</Text>
@@ -191,7 +191,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
               Start adding clothes to build your digital wardrobe
             </Text>
             <TouchableOpacity 
-              style={[styles.addFirstButton, { backgroundColor: theme.primary }]}
+              style={[styles.addFirstButton, { backgroundColor: '#8A724C' }]}
               onPress={() => navigation.navigate('AddClothes')}
             >
               <Text style={styles.addFirstButtonText}>Add Your First Item</Text>

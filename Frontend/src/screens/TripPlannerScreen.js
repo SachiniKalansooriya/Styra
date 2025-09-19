@@ -340,7 +340,7 @@ const TripPlannerScreen = ({ navigation }) => {
                </Text>
              </View>
              {tripDetails.packingStyle === style.id && (
-               <Ionicons name="checkmark-circle" size={24} color="#FF8C42" />
+               <Ionicons name="checkmark-circle" size={24} color="#8A724C" />
              )}
            </TouchableOpacity>
          ))}
@@ -414,6 +414,7 @@ const styles = StyleSheet.create({
    paddingVertical: 15,
    borderBottomWidth: 1,
    borderBottomColor: '#f0f0f0',
+   backgroundColor: '#F7F3E8',
  },
  headerTitle: {
    fontSize: 20,
@@ -482,7 +483,7 @@ const styles = StyleSheet.create({
  },
  durationText: {
    fontSize: 16,
-   color: '#FF8C42',
+   color: '#8A724C',
    fontWeight: '600',
  },
  activitiesButton: {
@@ -506,7 +507,7 @@ const styles = StyleSheet.create({
    marginTop: 10,
  },
  activityTag: {
-   backgroundColor: '#FF8C42',
+   backgroundColor: '#DCC9A7',
    paddingHorizontal: 12,
    paddingVertical: 6,
    borderRadius: 16,
@@ -514,7 +515,7 @@ const styles = StyleSheet.create({
    marginBottom: 8,
  },
  activityTagText: {
-   color: '#fff',
+   color: '#000',
    fontSize: 12,
    fontWeight: '500',
  },
@@ -531,8 +532,8 @@ const styles = StyleSheet.create({
    backgroundColor: '#f9f9f9',
  },
  selectedPackingStyle: {
-   borderColor: '#FF8C42',
-   backgroundColor: '#fff5f2',
+   borderColor: '#8A724C',
+   backgroundColor: '#EDE2CC',
  },
  packingStyleContent: {
    flex: 1,
@@ -548,7 +549,7 @@ const styles = StyleSheet.create({
    color: '#666',
  },
  selectedPackingStyleText: {
-   color: '#FF8C42',
+   color: '#8A724C',
  },
  bottomContainer: {
    paddingHorizontal: 20,
@@ -557,7 +558,7 @@ const styles = StyleSheet.create({
    borderTopColor: '#f0f0f0',
  },
  generateButton: {
-   backgroundColor: '#FF8C42',
+   backgroundColor: '#8A724C',
    flexDirection: 'row',
    justifyContent: 'center',
    alignItems: 'center',
@@ -619,14 +620,14 @@ const styles = StyleSheet.create({
    gap: 5,
  },
  selectedWeatherButton: {
-   backgroundColor: '#FF8C42',
+   backgroundColor: '#EDE2CC',
  },
  weatherButtonText: {
    fontSize: 14,
    color: '#666',
  },
  selectedWeatherButtonText: {
-   color: '#fff',
+   color: '#000',
  },
 });
 
