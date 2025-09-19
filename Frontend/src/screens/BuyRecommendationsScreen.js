@@ -62,8 +62,8 @@ const BuyRecommendationsScreen = ({ navigation }) => {
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high': return '#e74c3c';
-      case 'medium': return '#f39c12';
-      case 'low': return '#27ae60';
+      case 'medium': return '#8A724C';
+      case 'low': return '#B99668';
       default: return '#95a5a6';
     }
   };
@@ -167,15 +167,7 @@ const BuyRecommendationsScreen = ({ navigation }) => {
           </Text>
         </View>
       )}
-      
-      {analytics.budget_recommendation && (
-        <View style={styles.analyticsRow}>
-          <Ionicons name="wallet-outline" size={20} color="#27ae60" />
-          <Text style={styles.analyticsText}>
-            Budget: {analytics.budget_recommendation}
-          </Text>
-        </View>
-      )}
+  
       
       {analytics.color_palette && analytics.color_palette.dominant && (
         <View style={styles.colorPaletteSection}>
@@ -322,6 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
+    backgroundColor: '#F7F3E8',
   },
   headerTitle: {
     fontSize: 20,
@@ -343,9 +336,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   analyticsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#EDE2CC',
     borderRadius: 16,
     padding: 20,
+    marginTOP: 20,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -356,7 +350,7 @@ const styles = StyleSheet.create({
   analyticsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2c3e50',
+    color: '#8A724C',
     marginBottom: 15,
   },
   scoreContainer: {
@@ -367,7 +361,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#3498db',
+    backgroundColor: '#DCC9A7',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -375,7 +369,7 @@ const styles = StyleSheet.create({
   scoreValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'white',
   },
   scoreLabel: {
     fontSize: 14,
@@ -449,7 +443,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   recommendationCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F3E8',
     borderRadius: 16,
     padding: 20,
     marginBottom: 15,
@@ -540,20 +534,6 @@ const styles = StyleSheet.create({
     color: '#34495e',
     textTransform: 'capitalize',
   },
-  shopButton: {
-    backgroundColor: '#3498db',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  shopButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -571,17 +551,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 30,
-  },
-  addItemsButton: {
-    backgroundColor: '#3498db',
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  addItemsButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   bottomSpacing: {
     height: 20,

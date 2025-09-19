@@ -582,7 +582,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
             >
               <View style={[
                 styles.connectionDot, 
-                { backgroundColor: backendConnected ? '#F7F3E8' : '#F7F3E8' }
+                { backgroundColor: backendConnected ? 'green' : 'red' }
               ]} />
             </TouchableOpacity>
             
@@ -647,15 +647,6 @@ const HomeScreen = ({ navigation, onLogout }) => {
                       size={60} 
                       color="#fff" 
                     />
-                    <TouchableOpacity 
-                      style={styles.refreshButton} 
-                      onPress={() => {
-                        console.log('Refreshing GPS location and weather...');
-                        requestLocationPermission();
-                      }}
-                    >
-                      <Ionicons name="refresh" size={20} color="#fff" />
-                    </TouchableOpacity>
                   </View>
                   {todayWeather.humidity && (
                     <Text style={styles.weatherHumidity}>{todayWeather.humidity}% humidity</Text>
@@ -755,7 +746,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
                     </View>
                   </View>
                   <View style={styles.featureRight}>
-                    <Ionicons name="bag-add" size={50} color="#000" />
+                    <Ionicons name="bag-add" size={50} color="#B99668" />
                   </View>
                 </View>
               </View>
@@ -888,18 +879,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  refreshButton: {
-    position: 'absolute',
-    top: -5,
-    right: -10,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 15,
-    padding: 5,
-    marginTop: 5,
-  },
+ 
   weatherHumidity: {
     fontSize: 10,
-    color: '#fff',
+    color: '#000',
     opacity: 0.8,
     marginTop: 5,
   },
@@ -954,7 +937,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   insightCard: {
-    backgroundColor: '#D6CAB0',
+    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -988,7 +971,7 @@ const styles = StyleSheet.create({
   insightValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FF6B6B',
+    color: '#8A724C',
     marginBottom: 5,
   },
   insightValueSmall: {
