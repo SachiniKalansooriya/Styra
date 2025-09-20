@@ -21,8 +21,6 @@ from services.weather_service import weather_service
 from services.trip_service import trip_service
 from services.buy_recommendation_service import BuyRecommendationService
 from database.connection import DatabaseConnection
-from app.database.database import get_db, create_tables
-from app.models.user import User
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from datetime import datetime
@@ -67,9 +65,8 @@ async def lifespan(app: FastAPI):
     global trip_ai_service, outfit_history_service
     
     try:
-        # Create database tables
-        create_tables()
-        logger.info("Database tables created/verified")
+        # Database tables already created by setup script
+        logger.info("Database tables already created")
         
         # Test the image analysis service
         service_status = image_analysis_service.get_service_info()
@@ -241,10 +238,17 @@ async def health_check():
     
     return health_status
 
-# Authentication Routes
+# Add these imports at the top
+from utils.jwt_utils import verify_password, get_password_hash, create_access_token
+from utils.auth_dependencies import get_current_user, get_current_user_optional
+from datetime import timedelta
+import re
+
+# Replace your existing auth endpoints with these:
+
 @app.post("/auth/login")
-async def login(credentials: dict, db_session: Session = Depends(get_db)):
-    """Enhanced user login endpoint"""
+async def login(credentials: dict):
+    """JWT-based user login"""
     try:
         email = credentials.get("email")
         password = credentials.get("password")
@@ -253,47 +257,50 @@ async def login(credentials: dict, db_session: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Email and password required")
         
         # Basic email format validation
-        import re
         email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
         if not re.match(email_pattern, email):
             raise HTTPException(status_code=400, detail="Invalid email format")
         
-        # Find user by email
-        user = db_session.query(User).filter(User.email == email).first()
-        if not user:
+        # TODO: Replace with actual database user lookup
+        # For demo purposes, using hardcoded user
+        if email == "demo@styra.com" and password == "demo123":
+            # Create JWT token
+            access_token_expires = timedelta(minutes=60 * 24 * 7)  # 7 days
+            access_token = create_access_token(
+                data={"sub": 1, "email": email, "name": "Demo User"},
+                expires_delta=access_token_expires
+            )
+            
+            user_data = {
+                "id": 1,
+                "email": email,
+                "name": "Demo User",
+                "username": "Demo User"
+            }
+            
+            logger.info(f"Successful JWT login for user: {email}")
+            
+            return {
+                "status": "success",
+                "message": "Login successful",
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": 60 * 24 * 7 * 60,  # seconds
+                "user": user_data
+            }
+        else:
+            # In production, check against database with hashed passwords
             raise HTTPException(status_code=401, detail="Invalid email or password")
-        
-        # Verify password
-        if not verify_password(password, user.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        
-        # Check if user is active
-        if not user.is_active:
-            raise HTTPException(status_code=401, detail="Account is deactivated")
-        
-        logger.info(f"Successful login for user: {user.email}")
-        
-        return {
-            "status": "success",
-            "message": "Login successful",
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "name": user.full_name,
-                "username": user.username
-            },
-            "token": f"token_{user.id}"
-        }
+            
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Login error: {e}")
-        db_session.rollback()
         raise HTTPException(status_code=500, detail="Login failed")
 
 @app.post("/auth/signup")
-async def signup(user_data: dict, db_session: Session = Depends(get_db)):
-    """Enhanced user signup endpoint"""
+async def signup(user_data: dict):
+    """JWT-based user signup"""
     try:
         email = user_data.get("email")
         password = user_data.get("password")
@@ -310,59 +317,108 @@ async def signup(user_data: dict, db_session: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Name must be at least 2 characters")
         
         # Basic email format validation
-        import re
         email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
         if not re.match(email_pattern, email):
             raise HTTPException(status_code=400, detail="Invalid email format")
         
-        # Check if user already exists
-        existing_user = db_session.query(User).filter(User.email == email).first()
-        if existing_user:
-            raise HTTPException(status_code=409, detail="User with this email already exists")
+        # Hash password for storage
+        hashed_password = get_password_hash(password)
         
-        # Create new user
-        hashed_password = hash_password(password)
-        new_user = User(
-            email=email,
-            username=name,  # Use the full name as username
-            hashed_password=hashed_password,
-            full_name=name,
-            is_active=True
+        # TODO: In production, save user to database
+        # For demo, we'll just create a token
+        user_id = 1  # Would be returned from database
+        
+        # Create JWT token
+        access_token_expires = timedelta(minutes=60 * 24 * 7)  # 7 days
+        access_token = create_access_token(
+            data={"sub": user_id, "email": email, "name": name},
+            expires_delta=access_token_expires
         )
         
-        db_session.add(new_user)
-        db_session.commit()
-        db_session.refresh(new_user)
+        user_response = {
+            "id": user_id,
+            "email": email,
+            "name": name,
+            "username": name
+        }
         
         logger.info(f"User created successfully: {name} <{email}>")
         
         return {
             "status": "success",
             "message": "Account created successfully",
-            "user": {
-                "id": new_user.id,  # Now this will be an integer
-                "email": new_user.email,
-                "name": new_user.full_name,
-                "username": new_user.username
-            },
-            "token": f"token_{new_user.id}"
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": 60 * 24 * 7 * 60,  # seconds
+            "user": user_response
         }
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Signup error: {e}")
-        db_session.rollback()
         raise HTTPException(status_code=500, detail="Signup failed")
 
-# Wardrobe Routes
-@app.get("/api/wardrobe/items")
-async def get_wardrobe_items(user_id: int = 1):
-    """Get user's wardrobe items"""
+@app.post("/auth/verify")
+async def verify_token_endpoint(current_user: dict = Depends(get_current_user)):
+    """Verify JWT token and return user info"""
     try:
-        items = wardrobe_service.get_wardrobe_items()
+        # TODO: In production, fetch fresh user data from database
+        user_data = {
+            "id": current_user["user_id"],
+            "email": current_user["email"],
+            "name": "Demo User",  # Would fetch from database
+            "username": "Demo User"
+        }
+        
         return {
             "status": "success",
-            "items": items
+            "message": "Token is valid",
+            "user": user_data
+        }
+    except Exception as e:
+        logger.error(f"Token verification error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@app.post("/auth/logout")
+async def logout():
+    """Logout endpoint - JWT is stateless, so client should discard token"""
+    return {
+        "status": "success",
+        "message": "Logged out successfully. Please discard your token."
+    }
+
+@app.get("/auth/me")
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Get current authenticated user information"""
+    try:
+        # TODO: In production, fetch from database
+        user_data = {
+            "id": current_user["user_id"],
+            "email": current_user["email"],
+            "name": "Demo User",
+            "username": "Demo User"
+        }
+        
+        return {
+            "status": "success",
+            "user": user_data
+        }
+    except Exception as e:
+        logger.error(f"Get user info error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user info")
+    
+# Example: Protect wardrobe endpoints
+@app.get("/api/wardrobe/items")
+async def get_wardrobe_items(current_user: dict = Depends(get_current_user)):
+    """Get user's wardrobe items (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        items = wardrobe_service.get_wardrobe_items()  # Pass user_id in production
+        return {
+            "status": "success",
+            "items": items,
+            "user_id": user_id
         }
     except Exception as e:
         logger.error(f"Get wardrobe items error: {e}")

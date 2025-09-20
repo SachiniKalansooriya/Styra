@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, date
 from typing import Dict, List, Any, Optional
-from models.outfit_history import OutfitHistory
+from database.connection import db
 
 logger = logging.getLogger(__name__)
 

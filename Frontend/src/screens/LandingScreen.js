@@ -5,13 +5,34 @@ import {
   View, 
   TouchableOpacity, 
   Dimensions,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
 const { width, height } = Dimensions.get('window');
 
-export const LandingScreen = ({ navigation }) => {
+export const LandingScreen = ({ navigation, isAuthenticated = false, onLogout }) => {
+  useEffect(() => {
+    console.log('LandingScreen mounted with auth state:', isAuthenticated);
+  }, [isAuthenticated]);
+
+  const handleNavigate = (screenName, params = {}) => {
+    try {
+      console.log(`LandingScreen: navigation request -> ${screenName}`, { navigation });
+      if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate(screenName, params);
+      } else if (typeof navigation === 'function') {
+        // support fallback where navigation itself is a function
+        navigation(screenName, params);
+      } else {
+        console.warn('LandingScreen: navigation prop is not available');
+      }
+    } catch (err) {
+      console.error('LandingScreen navigation error:', err);
+    }
+  };
+
   return (
     <LinearGradient 
       colors={['#f5f3f0', '#e9e6dd', '#ddd9cf', '#d1cdc1']} 
@@ -32,28 +53,47 @@ export const LandingScreen = ({ navigation }) => {
         {/* Title Section */}
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Welcome to</Text>
-          <Text style={styles.brandName}>Styra</Text>
+          <Image
+            source={require('../../assets/styraicon.png')}
+            style={styles.brandLogo}
+            accessibilityLabel="Styra logo"
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Your AI-Powered Wardrobe Stylist</Text>
           <Text style={styles.description}>
             Discover perfect outfits with smart AI recommendations based on weather, occasion, and your personal style.
           </Text>
         </View>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Always show Create Account and Login */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={[styles.button, styles.primaryButton]}
-            onPress={() => navigation.navigate('SignUp')}
+            onPress={() => handleNavigate('SignUp')}
           >
-            <Text style={styles.primaryButtonText}>Get Started</Text>
+            <Text style={styles.primaryButtonText}>Create Account</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={[styles.button, styles.secondaryButton]}
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => handleNavigate('Login')}
           >
-            <Text style={styles.secondaryButtonText}>Sign In</Text>
+            <Text style={styles.secondaryButtonText}>Login</Text>
           </TouchableOpacity>
+
+          {/* Optional: Show sign out option if user is authenticated */}
+          {isAuthenticated && (
+            <TouchableOpacity 
+              style={styles.skipButton}
+              onPress={() => {
+                if (onLogout) {
+                  onLogout();
+                }
+              }}
+            >
+              <Text style={styles.skipText}>Sign Out</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
       </View>
@@ -79,28 +119,28 @@ const styles = StyleSheet.create({
     height: 200,
     top: -50,
     right: -50,
-    backgroundColor: 'rgba(233, 230, 221, 0.2)', // Original color with transparency
+    backgroundColor: 'rgba(233, 230, 221, 0.2)',
   },
   circle2: {
     width: 150,
     height: 150,
     bottom: 100,
     left: -30,
-    backgroundColor: 'rgba(221, 217, 207, 0.3)', // Darker shade
+    backgroundColor: 'rgba(221, 217, 207, 0.3)',
   },
   circle3: {
     width: 100,
     height: 100,
     top: height * 0.3,
     right: 20,
-    backgroundColor: 'rgba(209, 205, 193, 0.25)', // Even darker shade
+    backgroundColor: 'rgba(209, 205, 193, 0.25)',
   },
   circle4: {
     width: 80,
     height: 80,
     top: height * 0.15,
     left: 30,
-    backgroundColor: 'rgba(245, 243, 240, 0.4)', // Lighter shade
+    backgroundColor: 'rgba(245, 243, 240, 0.4)',
   },
   content: {
     flex: 1,
@@ -113,29 +153,25 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    color: '#5c5750', // Dark warm grey
+    color: '#5c5750',
     fontWeight: '300',
-    marginBottom: 5,
+    marginBottom: 1,
   },
-  brandName: {
-    fontSize: 48,
-    color: '#403c35', // Darkest warm brown
-    fontWeight: 'bold',
+  brandLogo: {
+    width: 300,
+    height: 300,
     marginBottom: 10,
-    textShadowColor: 'rgba(255, 255, 255, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
   },
   tagline: {
     fontSize: 18,
-    color: '#6b6659', // Medium warm grey
+    color: '#6b6659',
     fontWeight: '500',
     marginBottom: 15,
     textAlign: 'center',
   },
   description: {
     fontSize: 16,
-    color: '#7a7568', // Medium-light warm grey
+    color: '#7a7568',
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 10,
@@ -156,20 +192,20 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   primaryButton: {
-    backgroundColor: '#d1cdc1', // Darker shade
+    backgroundColor: '#d1cdc1',
   },
   primaryButtonText: {
-    color: '#403c35', // Dark brown text
+    color: '#403c35',
     fontSize: 18,
     fontWeight: 'bold',
   },
   secondaryButton: {
-    backgroundColor: '#e9e6dd', // Original color
+    backgroundColor: '#e9e6dd',
     borderWidth: 2,
-    borderColor: '#ddd9cf', // Medium shade border
+    borderColor: '#ddd9cf',
   },
   secondaryButtonText: {
-    color: '#5c5750', // Dark warm grey text
+    color: '#5c5750',
     fontSize: 18,
     fontWeight: '600',
   },
@@ -178,7 +214,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   skipText: {
-    color: '#8a8577', // Medium warm grey
+    color: '#8a8577',
     fontSize: 16,
     textDecorationLine: 'underline',
   },

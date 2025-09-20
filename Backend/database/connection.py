@@ -1,9 +1,9 @@
+# Backend/database/connection.py
 import psycopg2
 import psycopg2.extras
 import os
-from contextlib import contextmanager
-import logging
 from dotenv import load_dotenv
+import logging
 
 # Load environment variables
 load_dotenv()
@@ -12,68 +12,58 @@ logger = logging.getLogger(__name__)
 
 class DatabaseConnection:
     def __init__(self):
-        self.connection_string = os.getenv("DATABASE_URL")
-        if not self.connection_string:
-            # Try to construct from individual components
-            host = os.getenv("DB_HOST", "localhost")
-            port = os.getenv("DB_PORT", "5432")
-            user = os.getenv("DB_USER", "postgres")
-            password = os.getenv("DB_PASSWORD", "123456")
-            database = os.getenv("DB_NAME", "styra_wardrobe")
-            
-            self.connection_string = f"postgresql://{user}:{password}@{host}:{port}/{database}"
-            logger.info(f"Constructed DATABASE_URL from components")
+        self.connection = None
+        self.connect()
     
-    @contextmanager
-    def get_connection(self):
-        """Context manager for database connections"""
-        conn = None
+    def connect(self):
+        """Establish database connection"""
         try:
-            conn = psycopg2.connect(
-                self.connection_string,
+            DATABASE_URL = os.getenv("DATABASE_URL")
+            if not DATABASE_URL:
+                host = os.getenv("DB_HOST", "localhost")
+                port = os.getenv("DB_PORT", "5432")
+                user = os.getenv("DB_USER", "postgres")
+                password = os.getenv("DB_PASSWORD", "123456")
+                database = os.getenv("DB_NAME", "styra_wardrobe")
+                DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+            
+            self.connection = psycopg2.connect(
+                DATABASE_URL,
                 cursor_factory=psycopg2.extras.RealDictCursor
             )
-            yield conn
+            self.connection.autocommit = True
+            logger.info("Database connection established")
+            
         except Exception as e:
-            if conn:
-                conn.rollback()
-            logger.error(f"Database error: {e}")
-            raise
-        finally:
-            if conn:
-                conn.close()
+            logger.error(f"Database connection failed: {e}")
+            self.connection = None
     
-    def execute_query(self, query, params=None, fetch=True):
+    def get_connection(self):
+        """Get database connection"""
+        if not self.connection or self.connection.closed:
+            self.connect()
+        return self.connection
+    
+    def execute_query(self, query, params=None):
         """Execute a query and return results"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            
-            # Check if this is an INSERT/UPDATE/DELETE with RETURNING clause
-            is_returning_query = 'RETURNING' in query.upper() and any(keyword in query.upper() for keyword in ['INSERT', 'UPDATE', 'DELETE'])
-            
-            if fetch or is_returning_query:
-                result = None
-                if cursor.description:
-                    result = cursor.fetchall()
-                # Commit if it's a data modification query with RETURNING
-                if is_returning_query:
-                    conn.commit()
-                return result
-            else:
-                conn.commit()
-                return cursor.rowcount
-    
-    def test_connection(self):
-        """Test database connection"""
         try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT version();")
-                version = cursor.fetchone()
-                return {"status": "connected", "version": version[0]}
+            conn = self.get_connection()
+            if not conn:
+                raise Exception("No database connection")
+            
+            with conn.cursor() as cursor:
+                cursor.execute(query, params)
+                
+                if query.strip().upper().startswith('SELECT'):
+                    return cursor.fetchall()
+                elif 'RETURNING' in query.upper():
+                    return cursor.fetchone()
+                else:
+                    return True
+                    
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            logger.error(f"Database error: {e}")
+            raise e
 
 # Global database instance
 db = DatabaseConnection()

@@ -57,12 +57,11 @@ export default function App() {
     setScreenParams({});
   };
 
-  const handleSuccessfulAuth = (user) => {
-    console.log('Authentication successful for user:', user);
-    setIsAuthenticated(true);
-    navigate('Home');
-  };
-
+const handleSuccessfulAuth = (user) => {
+  console.log('Authentication successful for user:', user);
+  setIsAuthenticated(true);
+  navigate('Home'); // This will take user directly to Home after login/signup
+};
   const handleLogout = async () => {
     try {
       await authService.signOut();
@@ -74,43 +73,43 @@ export default function App() {
   };
 
   useEffect(() => {
-    const initializeApp = async () => {
-      console.log('=== APP INITIALIZATION START ===');
-      try {
-        // Check backend connection
-        const connectionResult = await connectionService.initializeApp();
-        setBackendConnected(connectionResult.backend.success);
-        
-        if (!connectionResult.backend.success) {
-          console.warn('Backend not available, using offline mode');
-        } else {
-          console.log('Backend connected successfully!');
-        }
+const initializeApp = async () => {
+  console.log('=== APP INITIALIZATION START ===');
+  try {
+    // Check backend connection first
+    const connectionResult = await connectionService.initializeApp();
+    setBackendConnected(connectionResult.backend.success);
+    
+    if (!connectionResult.backend.success) {
+      console.warn('Backend not available, using offline mode');
+    }
 
-        // Check if user is already authenticated
-        console.log('Checking authentication status...');
-        const authResult = await authService.loadUserFromStorage();
-        console.log('Auth result:', authResult);
-        
-        if (authResult.success && authResult.user) {
-          console.log('User loaded from storage:', authResult.user);
-          setIsAuthenticated(true);
-          setCurrentScreen('Home');
-        } else {
-          console.log('No authenticated user found, going to Landing');
-          setIsAuthenticated(false);
-          setCurrentScreen('Landing');
-        }
-      } catch (error) {
-        console.error('App initialization error:', error);
-        setIsAuthenticated(false);
-        setCurrentScreen('Landing');
-        setBackendConnected(false);
-      } finally {
-        setIsLoading(false);
-        console.log('=== APP INITIALIZATION COMPLETE ===');
-      }
-    };
+    // Check for stored authentication
+    const authResult = await authService.loadUserFromStorage();
+    
+    if (authResult.success && authResult.user) {
+      // User has valid stored auth - silently authenticate but stay on landing
+      console.log('Valid auth found, user can proceed to home when ready');
+      setIsAuthenticated(true);
+      // Don't automatically navigate - let user see landing page first
+    } else {
+      console.log('No valid authentication found');
+      setIsAuthenticated(false);
+    }
+    
+    // Always start with Landing screen
+    setCurrentScreen('Landing');
+    
+  } catch (error) {
+    console.error('App initialization error:', error);
+    setIsAuthenticated(false);
+    setCurrentScreen('Landing');
+    setBackendConnected(false);
+  } finally {
+    setIsLoading(false);
+    console.log('=== APP INITIALIZATION COMPLETE ===');
+  }
+};
 
     initializeApp();
   }, []);
