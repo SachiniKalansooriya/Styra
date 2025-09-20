@@ -1,3 +1,4 @@
+// src/services/authService.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import connectionService from './connectionService';
 
@@ -8,9 +9,41 @@ class AuthService {
     this.user = null;
   }
 
+  // Add validation methods
+  validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  validateSignupForm(formData) {
+    const errors = [];
+    const { name, email, password, confirmPassword } = formData;
+
+    if (!name || name.trim().length < 2) {
+      errors.push('Name must be at least 2 characters long');
+    }
+
+    if (!email || !this.validateEmail(email)) {
+      errors.push('Please enter a valid email address');
+    }
+
+    if (!password || password.length < 6) {
+      errors.push('Password must be at least 6 characters long');
+    }
+
+    if (password !== confirmPassword) {
+      errors.push('Passwords do not match');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
   async signIn(email, password) {
     try {
-      console.log('Attempting JWT login with:', email);
+      console.log('Attempting signin with:', email);
       
       const response = await fetch(`${this.baseURL}/auth/login`, {
         method: 'POST',
@@ -20,15 +53,32 @@ class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
       console.log('Login response status:', response.status);
-      console.log('Login response data:', data);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Login error response:', errorData);
+        return {
+          success: false,
+          error: errorData.detail || errorData.message || `Login failed with status ${response.status}`
+        };
+      }
 
-      if (response.ok && data.status === 'success' && data.access_token) {
-        // Store token and user data
-        await AsyncStorage.setItem('access_token', data.access_token);
-        await AsyncStorage.setItem('user_data', JSON.stringify(data.user));
-        await AsyncStorage.setItem('token_expires', data.expires_in.toString());
+      const data = await response.json();
+      console.log('Signin response:', data);
+
+      if (data.status === 'success' && data.access_token) {
+        // Store token and user data safely
+        try {
+          await AsyncStorage.setItem('access_token', data.access_token);
+          await AsyncStorage.setItem('user_data', JSON.stringify(data.user));
+          if (data.expires_in) {
+            await AsyncStorage.setItem('token_expires', data.expires_in.toString());
+          }
+        } catch (storageError) {
+          console.error('Storage error:', storageError);
+          // Continue anyway - the login was successful
+        }
         
         this.token = data.access_token;
         this.user = data.user;
@@ -38,7 +88,8 @@ class AuthService {
         return {
           success: true,
           user: data.user,
-          token: data.access_token
+          token: data.access_token,
+          message: data.message
         };
       } else {
         return {
@@ -47,7 +98,7 @@ class AuthService {
         };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Signin error:', error);
       return {
         success: false,
         error: 'Network error - please check your connection'
@@ -57,7 +108,7 @@ class AuthService {
 
   async signUp(userData) {
     try {
-      console.log('Attempting JWT signup with:', userData);
+      console.log('Attempting signup with:', userData);
       
       const response = await fetch(`${this.baseURL}/auth/signup`, {
         method: 'POST',
@@ -67,22 +118,26 @@ class AuthService {
         body: JSON.stringify(userData),
       });
 
+      console.log('Signup response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Signup error response:', errorData);
+        return {
+          success: false,
+          error: errorData.detail || errorData.message || `Signup failed with status ${response.status}`
+        };
+      }
+
       const data = await response.json();
       console.log('Signup response:', data);
 
-      if (response.ok && data.status === 'success' && data.access_token) {
-        // Store token and user data
-        await AsyncStorage.setItem('access_token', data.access_token);
-        await AsyncStorage.setItem('user_data', JSON.stringify(data.user));
-        await AsyncStorage.setItem('token_expires', data.expires_in.toString());
-        
-        this.token = data.access_token;
-        this.user = data.user;
-        
+      if (data.status === 'success') {
+        // Don't auto-login after signup - just return success
         return {
           success: true,
           user: data.user,
-          token: data.access_token
+          message: data.message || 'Account created successfully! Please log in.'
         };
       } else {
         return {

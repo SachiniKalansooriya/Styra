@@ -155,12 +155,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#5c5750',
     fontWeight: '300',
-    marginBottom: 1,
+    marginBottom: 40,
   },
   brandLogo: {
-    width: 300,
-    height: 300,
-    marginBottom: 10,
+    width: 200,
+    height: 200,
+    marginBottom: 40,
+    margintop: 40,
+
   },
   tagline: {
     fontSize: 18,

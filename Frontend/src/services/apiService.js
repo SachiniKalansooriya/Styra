@@ -1,4 +1,4 @@
-// apiService.js
+// src/services/apiService.js
 import API_CONFIG from '../config/api';
 
 class ApiService {
@@ -9,9 +9,24 @@ class ApiService {
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    
+    // Get auth token for protected endpoints
+    let authHeaders = {};
+    try {
+      // Dynamically import to avoid circular dependency
+      const authService = require('./authService').default;
+      const token = authService.getToken();
+      if (token && !endpoint.includes('/auth/')) {
+        authHeaders.Authorization = `Bearer ${token}`;
+      }
+    } catch (e) {
+      console.log('Could not get auth token:', e);
+    }
+    
     const config = {
       headers: {
         ...API_CONFIG.HEADERS,
+        ...authHeaders,
         ...options.headers,
       },
       ...options,
@@ -30,6 +45,33 @@ class ApiService {
       console.log('Response ok:', response.ok);
       
       if (!response.ok) {
+        // Don't clear auth for login endpoint 401s - those are expected for wrong credentials
+        if (response.status === 401 && !endpoint.includes('/auth/login')) {
+          console.log('Unauthorized response - clearing auth');
+          // Only import authService when needed to avoid circular dependencies
+          try {
+            const authService = require('./authService').default;
+            if (authService && authService.signOut) {
+              await authService.signOut();
+            }
+          } catch (e) {
+            console.log('Could not clear auth:', e);
+          }
+          throw new Error('Authentication expired. Please log in again.');
+        }
+        
+        // Log more details for 500 errors
+        if (response.status === 500) {
+          console.error('Server error 500 for endpoint:', endpoint);
+          try {
+            const errorData = await response.json();
+            console.error('Server error details:', errorData);
+          } catch (e) {
+            console.error('Could not parse server error response');
+          }
+        }
+        
+        // For other errors, let the calling code handle the response
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       

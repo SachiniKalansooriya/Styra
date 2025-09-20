@@ -17,6 +17,7 @@ import BuyRecommendationsScreen from './src/screens/BuyRecommendationsScreen';
 import connectionService from './src/services/connectionService';
 import authService from './src/services/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiService from './src/services/apiService';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('Landing');
@@ -86,11 +87,33 @@ const initializeApp = async () => {
 
     // Check for stored authentication
     const authResult = await authService.loadUserFromStorage();
-    
+
     if (authResult.success && authResult.user) {
-      // User has valid stored auth - silently authenticate but stay on landing
-      console.log('Valid auth found, user can proceed to home when ready');
-      setIsAuthenticated(true);
+      // Verify the stored token with backend before trusting it
+      try {
+        const token = authService.getToken ? authService.getToken() : null;
+        console.log('Found stored token, verifying with backend...');
+        const verifyResponse = await apiService.request('/auth/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          }
+        });
+
+        if (verifyResponse && verifyResponse.status === 'success') {
+          console.log('Token verified by backend. User authenticated.');
+          setIsAuthenticated(true);
+        } else {
+          console.log('Stored token invalid according to backend. Clearing local auth.');
+          await authService.signOut();
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        console.warn('Token verification failed:', err.message || err);
+        await authService.signOut();
+        setIsAuthenticated(false);
+      }
       // Don't automatically navigate - let user see landing page first
     } else {
       console.log('No valid authentication found');

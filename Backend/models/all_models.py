@@ -42,19 +42,23 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
+    username = Column(String(100), nullable=False)  # Changed from 'name'
+    full_name = Column(String(255), nullable=True)  # Added full_name field
+    hashed_password = Column(String(255), nullable=False)  # Changed from 'password_hash'
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    is_active = Column(Boolean, default=True)
     
     # Relationships
     wardrobe_items = relationship("WardrobeItem", back_populates="user", cascade="all, delete-orphan")
     outfit_history = relationship("OutfitHistory", back_populates="user", cascade="all, delete-orphan")
     favorite_outfits = relationship("FavoriteOutfit", back_populates="user", cascade="all, delete-orphan")
     trips = relationship("Trip", back_populates="user", cascade="all, delete-orphan")
-
+    analysis_history = relationship("AnalysisHistory", back_populates="user", cascade="all, delete-orphan")
+    buying_recommendations = relationship("BuyingRecommendation", back_populates="user", cascade="all, delete-orphan")
+    preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    
 # Wardrobe Management
 class WardrobeItem(Base):
     __tablename__ = "wardrobe_items"

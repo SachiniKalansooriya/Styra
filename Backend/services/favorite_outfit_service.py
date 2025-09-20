@@ -78,7 +78,7 @@ class FavoriteOutfitService:
                 return {
                     'success': True,
                     'message': 'Outfit saved to favorites!',
-                    'favorite_id': favorite_id
+                    'id': favorite_id
                 }
             else:
                 return {
@@ -88,6 +88,23 @@ class FavoriteOutfitService:
                 
         except Exception as e:
             logger.error(f"Error saving favorite outfit: {e}")
+            return {
+                'success': False,
+                'message': f'Error saving favorite: {str(e)}'
+            }
+    
+    def save_favorite(self, favorite_data: dict) -> Dict:
+        """Save an outfit as favorite - updated to match endpoint"""
+        try:
+            user_id = favorite_data['user_id']
+            outfit_name = favorite_data.get('name', f"Outfit {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+            outfit_data = favorite_data.get('outfit_data', {})
+            
+            # Use the existing save_favorite_outfit method
+            return self.save_favorite_outfit(user_id, outfit_data, outfit_name)
+            
+        except Exception as e:
+            logger.error(f"Error in save_favorite: {e}")
             return {
                 'success': False,
                 'message': f'Error saving favorite: {str(e)}'
@@ -139,31 +156,63 @@ class FavoriteOutfitService:
             logger.error(f"Error getting user favorites: {e}")
             return []
     
-    def delete_favorite(self, user_id: int, favorite_id: int) -> Dict:
-        """Delete a favorite outfit"""
+    def delete_favorite(self, favorite_id: int) -> bool:
+        """Delete a favorite outfit by ID"""
         try:
-            # Soft delete by setting is_active to false
             query = """
                 UPDATE favorite_outfits 
                 SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s AND user_id = %s
+                WHERE id = %s
             """
             
-            result = db.execute_query(query, (favorite_id, user_id))
-            
-            return {
-                'success': True,
-                'message': 'Favorite outfit deleted successfully'
-            }
+            db.execute_query(query, (favorite_id,))
+            return True
             
         except Exception as e:
-            logger.error(f"Error deleting favorite outfit: {e}")
-            return {
-                'success': False,
-                'message': f'Error deleting favorite: {str(e)}'
-            }
+            logger.error(f"Error deleting favorite: {e}")
+            return False
     
-    def update_favorite(self, user_id: int, favorite_id: int, updates: Dict) -> Dict:
+    def get_favorite_by_id(self, favorite_id: int) -> Optional[Dict]:
+        """Get a favorite outfit by ID"""
+        try:
+            query = """
+                SELECT id, user_id, outfit_name, outfit_data, occasion, season, 
+                       weather_context, confidence_score, notes, times_worn,
+                       last_worn, created_at, updated_at
+                FROM favorite_outfits
+                WHERE id = %s AND is_active = TRUE
+            """
+            
+            result = db.execute_query(query, (favorite_id,))
+            
+            if result:
+                fav = result[0]
+                outfit_items = json.loads(fav['outfit_data']) if fav['outfit_data'] else []
+                weather_context = json.loads(fav['weather_context']) if fav['weather_context'] else {}
+                
+                return {
+                    'id': fav['id'],
+                    'user_id': fav['user_id'],
+                    'name': fav['outfit_name'],
+                    'items': outfit_items,
+                    'occasion': fav['occasion'],
+                    'season': fav['season'],
+                    'weather_context': weather_context,
+                    'confidence': fav['confidence_score'],
+                    'notes': fav['notes'],
+                    'times_worn': fav['times_worn'] or 0,
+                    'last_worn': fav['last_worn'].isoformat() if fav['last_worn'] else None,
+                    'created_at': fav['created_at'].isoformat() if fav['created_at'] else None,
+                    'updated_at': fav['updated_at'].isoformat() if fav['updated_at'] else None
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting favorite by ID: {e}")
+            return None
+    
+    def update_favorite(self, favorite_id: int, updates: Dict) -> Dict:
         """Update a favorite outfit"""
         try:
             # Build dynamic update query
@@ -189,12 +238,12 @@ class FavoriteOutfitService:
                 }
             
             update_fields.append('updated_at = CURRENT_TIMESTAMP')
-            values.extend([favorite_id, user_id])
+            values.append(favorite_id)
             
             query = f"""
                 UPDATE favorite_outfits 
                 SET {', '.join(update_fields)}
-                WHERE id = %s AND user_id = %s
+                WHERE id = %s
             """
             
             db.execute_query(query, values)
@@ -211,7 +260,7 @@ class FavoriteOutfitService:
                 'message': f'Error updating favorite: {str(e)}'
             }
     
-    def wear_favorite_outfit(self, user_id: int, favorite_id: int) -> Dict:
+    def wear_favorite_outfit(self, favorite_id: int) -> Dict:
         """Mark a favorite outfit as worn"""
         try:
             query = """
@@ -219,10 +268,10 @@ class FavoriteOutfitService:
                 SET times_worn = times_worn + 1, 
                     last_worn = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s AND user_id = %s
+                WHERE id = %s
             """
             
-            db.execute_query(query, (favorite_id, user_id))
+            db.execute_query(query, (favorite_id,))
             
             return {
                 'success': True,
@@ -235,45 +284,6 @@ class FavoriteOutfitService:
                 'success': False,
                 'message': f'Error updating worn status: {str(e)}'
             }
-    
-    def get_favorite_by_id(self, user_id: int, favorite_id: int) -> Optional[Dict]:
-        """Get a specific favorite outfit by ID"""
-        try:
-            query = """
-                SELECT id, outfit_name, outfit_data, occasion, season, 
-                       weather_context, confidence_score, notes, times_worn,
-                       last_worn, created_at, updated_at
-                FROM favorite_outfits
-                WHERE id = %s AND user_id = %s AND is_active = TRUE
-            """
-            
-            result = db.execute_query(query, (favorite_id, user_id))
-            
-            if result:
-                fav = result[0]
-                outfit_items = json.loads(fav['outfit_data']) if fav['outfit_data'] else []
-                weather_context = json.loads(fav['weather_context']) if fav['weather_context'] else {}
-                
-                return {
-                    'id': fav['id'],
-                    'name': fav['outfit_name'],
-                    'items': outfit_items,
-                    'occasion': fav['occasion'],
-                    'season': fav['season'],
-                    'weather_context': weather_context,
-                    'confidence': fav['confidence_score'],
-                    'notes': fav['notes'],
-                    'times_worn': fav['times_worn'] or 0,
-                    'last_worn': fav['last_worn'].isoformat() if fav['last_worn'] else None,
-                    'created_at': fav['created_at'].isoformat() if fav['created_at'] else None,
-                    'updated_at': fav['updated_at'].isoformat() if fav['updated_at'] else None
-                }
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error getting favorite by ID: {e}")
-            return None
 
 # Global instance
 favorite_outfit_service = FavoriteOutfitService()

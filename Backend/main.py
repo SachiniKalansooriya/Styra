@@ -23,11 +23,12 @@ from services.buy_recommendation_service import BuyRecommendationService
 from database.connection import DatabaseConnection
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import glob
 import uuid
 from pathlib import Path
+import re
 
 # Load environment variables
 load_dotenv()
@@ -43,16 +44,9 @@ logger = logging.getLogger(__name__)
 # Initialize database connection
 db = DatabaseConnection()
 
-# Initialize password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt"""
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+# JWT and Auth imports
+from utils.jwt_utils import verify_password, get_password_hash, create_access_token
+from utils.auth_dependencies import get_current_user, get_current_user_optional
 
 # Initialize services
 trip_ai_service = None
@@ -65,8 +59,21 @@ async def lifespan(app: FastAPI):
     global trip_ai_service, outfit_history_service
     
     try:
-        # Database tables already created by setup script
-        logger.info("Database tables already created")
+        # Create users table if it doesn't exist
+        create_users_table_sql = """
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            username VARCHAR(255) NOT NULL,
+            hashed_password VARCHAR(255) NOT NULL,
+            full_name VARCHAR(255),
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+        db.execute_query(create_users_table_sql)
+        logger.info("Users table created/verified")
         
         # Test the image analysis service
         service_status = image_analysis_service.get_service_info()
@@ -87,7 +94,6 @@ async def lifespan(app: FastAPI):
         if DATABASE_URL:
             try:
                 conn = psycopg2.connect(DATABASE_URL)
-                # Don't close the connection - keep it for the service
                 outfit_history_service = OutfitHistoryService(conn)
                 logger.info("Database connection successful and outfit history service initialized")
             except Exception as e:
@@ -109,7 +115,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Styra AI Wardrobe Backend",
-    description="Backend API with Free AI Clothing Analysis, Trip Planning, and Smart Outfit Recommendations",
+    description="Backend API with JWT Authentication, AI Clothing Analysis, Trip Planning, and Smart Outfit Recommendations",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -138,8 +144,11 @@ async def root():
             "version": "2.0.0",
             "database": "PostgreSQL",
             "ai_analysis": ai_status,
+            "authentication": "JWT",
             "storage": "Static Files Only",
             "features": [
+                "JWT Authentication",
+                "User Registration & Login",
                 "Free AI Clothing Analysis",
                 "Automatic Category Detection",
                 "Color Recognition",
@@ -178,11 +187,17 @@ async def health_check():
             cursor = conn.cursor()
             cursor.execute("SELECT version();")
             version = cursor.fetchone()[0]
+            
+            # Test users table
+            cursor.execute("SELECT COUNT(*) FROM users;")
+            user_count = cursor.fetchone()[0]
+            
             cursor.close()
             conn.close()
             health_status["services"]["database"] = {
                 "status": "connected",
-                "version": version[:50]
+                "version": version[:50],
+                "user_count": user_count
             }
         else:
             health_status["services"]["database"] = {
@@ -212,95 +227,25 @@ async def health_check():
         }
         health_status["status"] = "degraded"
     
-    # Check outfit AI service
+    # Check authentication
     try:
-        health_status["services"]["outfit_ai"] = {
+        health_status["services"]["authentication"] = {
             "status": "ready",
-            "features": ["weather_integration", "occasion_matching", "color_harmony", "wardrobe_analysis"]
+            "jwt_enabled": True,
+            "token_expiry": "7 days"
         }
     except Exception as e:
-        health_status["services"]["outfit_ai"] = {
-            "status": "error",
-            "error": str(e)
-        }
-    
-    # Check trip AI service
-    try:
-        health_status["services"]["trip_ai"] = {
-            "status": "ready",
-            "features": ["wardrobe_analysis", "smart_recommendations", "coverage_calculation"]
-        }
-    except Exception as e:
-        health_status["services"]["trip_ai"] = {
+        health_status["services"]["authentication"] = {
             "status": "error",
             "error": str(e)
         }
     
     return health_status
 
-# Add these imports at the top
-from utils.jwt_utils import verify_password, get_password_hash, create_access_token
-from utils.auth_dependencies import get_current_user, get_current_user_optional
-from datetime import timedelta
-import re
-
-# Replace your existing auth endpoints with these:
-
-@app.post("/auth/login")
-async def login(credentials: dict):
-    """JWT-based user login"""
-    try:
-        email = credentials.get("email")
-        password = credentials.get("password")
-        
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password required")
-        
-        # Basic email format validation
-        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
-        if not re.match(email_pattern, email):
-            raise HTTPException(status_code=400, detail="Invalid email format")
-        
-        # TODO: Replace with actual database user lookup
-        # For demo purposes, using hardcoded user
-        if email == "demo@styra.com" and password == "demo123":
-            # Create JWT token
-            access_token_expires = timedelta(minutes=60 * 24 * 7)  # 7 days
-            access_token = create_access_token(
-                data={"sub": 1, "email": email, "name": "Demo User"},
-                expires_delta=access_token_expires
-            )
-            
-            user_data = {
-                "id": 1,
-                "email": email,
-                "name": "Demo User",
-                "username": "Demo User"
-            }
-            
-            logger.info(f"Successful JWT login for user: {email}")
-            
-            return {
-                "status": "success",
-                "message": "Login successful",
-                "access_token": access_token,
-                "token_type": "bearer",
-                "expires_in": 60 * 24 * 7 * 60,  # seconds
-                "user": user_data
-            }
-        else:
-            # In production, check against database with hashed passwords
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        raise HTTPException(status_code=500, detail="Login failed")
-
+# Authentication Endpoints
 @app.post("/auth/signup")
 async def signup(user_data: dict):
-    """JWT-based user signup"""
+    """JWT-based user signup - saves to database"""
     try:
         email = user_data.get("email")
         password = user_data.get("password")
@@ -321,54 +266,185 @@ async def signup(user_data: dict):
         if not re.match(email_pattern, email):
             raise HTTPException(status_code=400, detail="Invalid email format")
         
-        # Hash password for storage
+        # Check if user already exists
+        try:
+            check_user_query = "SELECT id FROM users WHERE email = %s LIMIT 1;"
+            existing_user = db.execute_query(check_user_query, (email,))
+            
+            if existing_user:
+                raise HTTPException(status_code=409, detail="User with this email already exists")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Database check error: {e}")
+        
+        # Hash password
         hashed_password = get_password_hash(password)
         
-        # TODO: In production, save user to database
-        # For demo, we'll just create a token
-        user_id = 1  # Would be returned from database
-        
-        # Create JWT token
-        access_token_expires = timedelta(minutes=60 * 24 * 7)  # 7 days
-        access_token = create_access_token(
-            data={"sub": user_id, "email": email, "name": name},
-            expires_delta=access_token_expires
-        )
-        
-        user_response = {
-            "id": user_id,
-            "email": email,
-            "name": name,
-            "username": name
-        }
-        
-        logger.info(f"User created successfully: {name} <{email}>")
-        
-        return {
-            "status": "success",
-            "message": "Account created successfully",
-            "access_token": access_token,
-            "token_type": "bearer",
-            "expires_in": 60 * 24 * 7 * 60,  # seconds
-            "user": user_response
-        }
+        # Create user in database
+        try:
+            insert_query = """
+                INSERT INTO users (email, username, hashed_password, full_name, is_active, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id, email, username, full_name;
+            """
+            result = db.execute_query(insert_query, (
+                email,
+                name,
+                hashed_password,
+                name,
+                True,
+                datetime.now()
+            ))
+            
+            if not result:
+                raise HTTPException(status_code=500, detail="Failed to create user")
+            
+            new_user = result if isinstance(result, dict) else result[0] if result else None
+            
+            logger.info(f"User created successfully: {name} <{email}> (id={new_user['id']})")
+            
+            # Create JWT token for auto-login after signup
+            access_token_expires = timedelta(minutes=60 * 24 * 7)  # 7 days
+            access_token = create_access_token(
+                data={
+                    "sub": str(new_user['id']),  # Ensure sub is string for JWT spec compliance
+                    "email": new_user['email'], 
+                    "name": new_user['full_name'] or new_user['username']
+                },
+                expires_delta=access_token_expires
+            )
+            
+            # Return success with auto-login token
+            return {
+                "status": "success",
+                "message": "Account created successfully!",
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": 60 * 24 * 7 * 60,  # seconds
+                "user": {
+                    "id": new_user['id'],
+                    "email": new_user['email'],
+                    "name": new_user['full_name'],
+                    "username": new_user['username']
+                }
+            }
+            
+        except Exception as e:
+            logger.exception("Database insert error")
+            raise HTTPException(status_code=500, detail="Failed to create user account")
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Signup error: {e}")
+        logger.exception("Signup error")
         raise HTTPException(status_code=500, detail="Signup failed")
+
+@app.post("/auth/login")
+async def login(credentials: dict):
+    """JWT-based user login - checks database"""
+    try:
+        email = credentials.get("email")
+        password = credentials.get("password")
+        
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password required")
+        
+        # Basic email format validation
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_pattern, email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
+        # Get user from database
+        try:
+            user_query = """
+                SELECT id, email, username, hashed_password, full_name, is_active 
+                FROM users 
+                WHERE email = %s 
+                LIMIT 1;
+            """
+            user_result = db.execute_query(user_query, (email,))
+            
+            if not user_result:
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+            user = user_result[0] if isinstance(user_result, list) else user_result
+            
+            # Check if user is active
+            if not user.get('is_active', True):
+                raise HTTPException(status_code=401, detail="Account is deactivated")
+            
+            # Verify password
+            if not verify_password(password, user['hashed_password']):
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+            # Create JWT token
+            access_token_expires = timedelta(minutes=60 * 24 * 7)  # 7 days
+            access_token = create_access_token(
+                data={
+                    "sub": str(user['id']),  # Ensure sub is string for JWT spec compliance
+                    "email": user['email'], 
+                    "name": user.get('full_name') or user.get('username')
+                },
+                expires_delta=access_token_expires
+            )
+            
+            user_data = {
+                "id": int(user['id']),
+                "email": user['email'],
+                "name": user.get('full_name') or user.get('username'),
+                "username": user.get('username')
+            }
+            
+            logger.info(f"Successful JWT login for user: {email}")
+            
+            return {
+                "status": "success",
+                "message": "Login successful",
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": 60 * 24 * 7 * 60,  # seconds
+                "user": user_data
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Database query error: {e}")
+            raise HTTPException(status_code=500, detail="Login failed")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed")
 
 @app.post("/auth/verify")
 async def verify_token_endpoint(current_user: dict = Depends(get_current_user)):
     """Verify JWT token and return user info"""
     try:
-        # TODO: In production, fetch fresh user data from database
+        # Get fresh user data from database
+        user_query = """
+            SELECT id, email, username, full_name, is_active 
+            FROM users 
+            WHERE id = %s 
+            LIMIT 1;
+        """
+        user_result = db.execute_query(user_query, (current_user["user_id"],))
+        
+        if not user_result:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        user = user_result[0] if isinstance(user_result, list) else user_result
+        
+        if not user.get('is_active', True):
+            raise HTTPException(status_code=401, detail="Account is deactivated")
+        
         user_data = {
-            "id": current_user["user_id"],
-            "email": current_user["email"],
-            "name": "Demo User",  # Would fetch from database
-            "username": "Demo User"
+            "id": int(user['id']),
+            "email": user['email'],
+            "name": user.get('full_name') or user.get('username'),
+            "username": user.get('username')
         }
         
         return {
@@ -392,12 +468,25 @@ async def logout():
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """Get current authenticated user information"""
     try:
-        # TODO: In production, fetch from database
+        # Get fresh user data from database
+        user_query = """
+            SELECT id, email, username, full_name, is_active 
+            FROM users 
+            WHERE id = %s 
+            LIMIT 1;
+        """
+        user_result = db.execute_query(user_query, (current_user["user_id"],))
+        
+        if not user_result:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user = user_result[0] if isinstance(user_result, list) else user_result
+        
         user_data = {
-            "id": current_user["user_id"],
-            "email": current_user["email"],
-            "name": "Demo User",
-            "username": "Demo User"
+            "id": int(user['id']),
+            "email": user['email'],
+            "name": user.get('full_name') or user.get('username'),
+            "username": user.get('username')
         }
         
         return {
@@ -407,32 +496,34 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Get user info error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get user info")
-    
-# Example: Protect wardrobe endpoints
+
+# Protected Wardrobe Endpoints
 @app.get("/api/wardrobe/items")
 async def get_wardrobe_items(current_user: dict = Depends(get_current_user)):
     """Get user's wardrobe items (protected)"""
     try:
+        logger.info(f"Getting wardrobe items for current_user: {current_user}")
         user_id = current_user["user_id"]
+        logger.info(f"Extracted user_id: {user_id}")
         items = wardrobe_service.get_wardrobe_items()  # Pass user_id in production
+        logger.info(f"Retrieved {len(items)} items from wardrobe service")
         return {
             "status": "success",
             "items": items,
             "user_id": user_id
         }
     except Exception as e:
-        logger.error(f"Get wardrobe items error: {e}")
+        logger.exception("Get wardrobe items error")
         raise HTTPException(status_code=500, detail="Failed to retrieve wardrobe items")
 
 @app.post("/api/wardrobe/items")
-async def add_wardrobe_item(item_data: dict):
-    """Add item to wardrobe with smart image path detection"""
+async def add_wardrobe_item(item_data: dict, current_user: dict = Depends(get_current_user)):
+    """Add item to wardrobe with smart image path detection (protected)"""
     global last_analyzed_image
     
     try:
-        logger.info(f"Adding wardrobe item: {item_data.get('name', 'Unknown')}")
-        logger.info(f"Item data keys: {list(item_data.keys())}")
-        logger.info(f"Last analyzed image: {last_analyzed_image}")
+        user_id = current_user["user_id"]
+        logger.info(f"Adding wardrobe item for user {user_id}: {item_data.get('name', 'Unknown')}")
         
         image_path = None
         
@@ -487,8 +578,9 @@ async def add_wardrobe_item(item_data: dict):
         for field in fields_to_remove:
             item_data.pop(field, None)
         
-        # Set the final image path
+        # Set the final image path and user_id
         item_data['image_path'] = image_path
+        item_data['user_id'] = user_id
         logger.info(f"Final image_path for database: {image_path}")
         
         # Map analysis fields to database fields
@@ -521,9 +613,11 @@ async def add_wardrobe_item(item_data: dict):
         raise HTTPException(status_code=500, detail="Failed to add item")
 
 @app.delete("/api/wardrobe/items/{item_id}")
-async def delete_wardrobe_item(item_id: int):
-    """Delete a wardrobe item"""
+async def delete_wardrobe_item(item_id: int, current_user: dict = Depends(get_current_user)):
+    """Delete a wardrobe item (protected)"""
     try:
+        user_id = current_user["user_id"]
+        
         # Get the item first to clean up the image
         item = wardrobe_service.get_wardrobe_item_by_id(item_id)
         if item and item.get('image_path'):
@@ -534,19 +628,187 @@ async def delete_wardrobe_item(item_id: int):
         if success:
             return {
                 "status": "success",
-                "message": "Item deleted successfully"
-            }
+                "message": "Item deleted successfully"}
         else:
             raise HTTPException(status_code=404, detail="Item not found")
     except Exception as e:
         logger.error(f"Delete wardrobe item error: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete item")
 
-@app.get("/api/wardrobe/stats")
-async def get_wardrobe_stats(user_id: int = 1):
-    """Get wardrobe statistics"""
+@app.get("/api/outfit/history")
+async def get_outfit_history(
+    user_id: int = None,
+    limit: int = 50, 
+    start_date: str = None, 
+    end_date: str = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user's outfit history (protected)"""
     try:
-        items = wardrobe_service.get_wardrobe_items()
+        # Use the authenticated user's ID if no user_id provided, or verify access
+        if user_id is None:
+            user_id = current_user["user_id"]
+        elif current_user["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        logger.info(f"Getting outfit history for user {user_id}")
+        
+        if outfit_history_service:
+            result = outfit_history_service.get_user_outfit_history(
+                user_id=user_id,
+                limit=limit,
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            return {
+                "status": "success",
+                "history": result.get('history', []),
+                "count": len(result.get('history', [])),
+                "user_id": user_id
+            }
+        else:
+            # Service not available, return empty history
+            logger.warning("Outfit history service not available")
+            return {
+                "status": "success",
+                "history": [],
+                "count": 0,
+                "user_id": user_id,
+                "message": "Outfit history tracking not available"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get outfit history error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get outfit history")
+    
+
+# Favorite Outfit Routes (Protected)
+@app.get("/api/favorites")
+async def get_user_favorites(current_user: dict = Depends(get_current_user)):
+    """Get user's favorite outfits (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        logger.info(f"Getting favorites for user {user_id}")
+        
+        # Use the favorite outfit service
+        favorites = favorite_outfit_service.get_user_favorites(user_id)
+        
+        return {
+            "status": "success",
+            "favorites": favorites,
+            "count": len(favorites),
+            "user_id": user_id
+        }
+    except Exception as e:
+        logger.error(f"Get favorites error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get favorites")
+
+@app.post("/api/favorites")
+async def save_favorite_outfit(favorite_data: dict, current_user: dict = Depends(get_current_user)):
+    """Save outfit as favorite (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        favorite_data['user_id'] = user_id  # Ensure favorite belongs to authenticated user
+        logger.info(f"Saving favorite for user {user_id}: {favorite_data.get('name', 'Unknown')}")
+        
+        # Use the favorite outfit service
+        result = favorite_outfit_service.save_favorite(favorite_data)
+        
+        if result.get('success'):
+            return {
+                "status": "success",
+                "favorite_id": result["id"],
+                "message": "Favorite saved successfully",
+                "user_id": user_id
+            }
+        else:
+            logger.error(f"Service returned error: {result}")
+            raise HTTPException(status_code=500, detail=result.get('message', 'Failed to save favorite'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save favorite error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save favorite")
+
+@app.delete("/api/favorites/{favorite_id}")
+async def delete_favorite_outfit(favorite_id: int, current_user: dict = Depends(get_current_user)):
+    """Delete a favorite outfit (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        
+        # Verify the favorite belongs to the user
+        favorite = favorite_outfit_service.get_favorite_by_id(favorite_id)
+        if not favorite or favorite.get('user_id') != user_id:
+            raise HTTPException(status_code=404, detail="Favorite not found")
+        
+        success = favorite_outfit_service.delete_favorite(favorite_id)
+        if success:
+            return {
+                "status": "success",
+                "message": "Favorite deleted successfully"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete favorite")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete favorite error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete favorite")
+
+@app.get("/api/favorites/{favorite_id}")
+async def get_favorite_outfit(favorite_id: int, current_user: dict = Depends(get_current_user)):
+    """Get specific favorite outfit (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        
+        favorite = favorite_outfit_service.get_favorite_by_id(favorite_id)
+        if not favorite or favorite.get('user_id') != user_id:
+            raise HTTPException(status_code=404, detail="Favorite not found")
+        
+        return {
+            "status": "success",
+            "favorite": favorite
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get favorite error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get favorite")
+    
+@app.post("/api/favorites/{favorite_id}/wear")
+async def wear_favorite_outfit(favorite_id: int, current_user: dict = Depends(get_current_user)):
+    """Mark a favorite outfit as worn (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        
+        # Verify the favorite belongs to the user
+        favorite = favorite_outfit_service.get_favorite_by_id(favorite_id)
+        if not favorite or favorite.get('user_id') != user_id:
+            raise HTTPException(status_code=404, detail="Favorite not found")
+        
+        result = favorite_outfit_service.wear_favorite_outfit(favorite_id)
+        if result['success']:
+            return {
+                "status": "success",
+                "message": result['message']
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Wear favorite error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to mark favorite as worn")
+
+@app.get("/api/wardrobe/stats")
+async def get_wardrobe_stats(current_user: dict = Depends(get_current_user)):
+    """Get wardrobe statistics (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        items = wardrobe_service.get_wardrobe_items()  # Pass user_id in production
         total_items = len(items)
         
         # Calculate category distribution
@@ -566,14 +828,15 @@ async def get_wardrobe_stats(user_id: int = 1):
                 "colors": colors,
                 "most_worn_category": max(categories.keys(), key=categories.get) if categories else "none",
                 "least_worn_category": min(categories.keys(), key=categories.get) if categories else "none",
-                "ai_analysis_accuracy": 0.87
+                "ai_analysis_accuracy": 0.87,
+                "user_id": user_id
             }
         }
     except Exception as e:
         logger.error(f"Get wardrobe stats error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get stats")
 
-# AI Analysis Routes
+# AI Analysis Routes (Authentication Optional for Analysis, Required for Saving)
 @app.post("/api/analyze-clothing")
 async def analyze_clothing_image(image: UploadFile = File(...)):
     """Analyze clothing item and store image path globally"""
@@ -638,12 +901,12 @@ async def analyze_clothing_image(image: UploadFile = File(...)):
         logger.error(f"Analysis failed: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-# AI Outfit Recommendation Routes
+# AI Outfit Recommendation Routes (Protected)
 @app.post("/api/outfit/ai-recommendation")
-async def get_ai_outfit_recommendation(request_data: dict):
-    """Generate AI outfit recommendation from user's actual wardrobe"""
+async def get_ai_outfit_recommendation(request_data: dict, current_user: dict = Depends(get_current_user)):
+    """Generate AI outfit recommendation from user's actual wardrobe (protected)"""
     try:
-        user_id = request_data.get('user_id', 1)
+        user_id = current_user["user_id"]
         location = request_data.get('location', {})
         demo_weather = request_data.get('demo_weather')
         occasion = request_data.get('occasion', 'casual')
@@ -702,7 +965,8 @@ async def get_ai_outfit_recommendation(request_data: dict):
             "status": "success",
             "outfit": outfit_recommendation,
             "weather": weather_data,
-            "message": "AI recommendation generated from your wardrobe"
+            "message": "AI recommendation generated from your wardrobe",
+            "user_id": user_id
         }
         
     except Exception as e:
@@ -710,9 +974,13 @@ async def get_ai_outfit_recommendation(request_data: dict):
         raise HTTPException(status_code=500, detail=f"Failed to generate AI recommendation: {str(e)}")
 
 @app.get("/api/outfit/wardrobe-analysis/{user_id}")
-async def analyze_user_wardrobe(user_id: int):
-    """Analyze user's wardrobe for AI insights"""
+async def analyze_user_wardrobe(user_id: int, current_user: dict = Depends(get_current_user)):
+    """Analyze user's wardrobe for AI insights (protected)"""
     try:
+        # Ensure user can only access their own wardrobe analysis
+        if current_user["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
         wardrobe_items = enhanced_outfit_service.get_user_wardrobe_items(user_id)
         
         if not wardrobe_items:
@@ -812,16 +1080,18 @@ async def analyze_user_wardrobe(user_id: int):
         logger.error(f"Wardrobe analysis error: {e}")
         raise HTTPException(status_code=500, detail="Failed to analyze wardrobe")
 
+# Additional protected endpoints following the same pattern...
+
 @app.post("/api/outfit/multiple-recommendations")
-async def get_multiple_outfit_recommendations(request_data: dict):
-    """Generate multiple AI outfit recommendations for different occasions"""
+async def get_multiple_outfit_recommendations(request_data: dict, current_user: dict = Depends(get_current_user)):
+    """Generate multiple AI outfit recommendations for different occasions (protected)"""
     try:
-        user_id = request_data.get('user_id', 1)
+        user_id = current_user["user_id"]
         location = request_data.get('location', {})
         occasions = request_data.get('occasions', ['casual', 'work', 'formal', 'workout', 'datenight'])
         demo_weather = request_data.get('demo_weather')
         
-        # Check if demo weather is provided
+        # Weather data processing (same as above)
         if demo_weather:
             weather_data = {
                 'temperature': demo_weather.get('temperature', 25),
@@ -832,7 +1102,6 @@ async def get_multiple_outfit_recommendations(request_data: dict):
                 'location': demo_weather.get('location', 'Demo Location')
             }
         else:
-            # Create default weather data
             weather_data = {
                 'temperature': 22,
                 'condition': 'partly cloudy',
@@ -859,85 +1128,87 @@ async def get_multiple_outfit_recommendations(request_data: dict):
             "recommendations": result['recommendations'],
             "wardrobe_analysis": result['wardrobe_analysis'],
             "weather": weather_data,
-            "message": f"Generated outfit recommendations for all occasions"
+            "message": f"Generated outfit recommendations for all occasions",
+            "user_id": user_id
         }
         
     except Exception as e:
         logger.error(f"Multiple recommendations error: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate multiple recommendations")
 
-@app.post("/api/outfit/enhanced-recommendations")
-async def get_enhanced_outfit_recommendations(request_data: dict):
-    """Generate enhanced AI outfit recommendations with detailed analysis"""
+@app.post("/api/outfit/wear")
+async def record_worn_outfit(request_data: dict, current_user: dict = Depends(get_current_user)):
+    """Record when a user wears an outfit (protected)"""
     try:
-        user_id = request_data.get('user_id', 1)
-        location = request_data.get('location', {})
-        occasions = request_data.get('occasions', ['casual', 'work', 'formal', 'workout', 'datenight'])
-        demo_weather = request_data.get('demo_weather')
+        user_id = current_user["user_id"]
+        outfit_data = request_data.get('outfit_data', {})
+        occasion = request_data.get('occasion', 'casual')
+        weather = request_data.get('weather', '')
+        location = request_data.get('location', '')
+        worn_date = request_data.get('worn_date', datetime.now().date())
         
-        # Check if demo weather is provided
-        if demo_weather:
-            weather_data = {
-                'temperature': demo_weather.get('temperature', 25),
-                'condition': demo_weather.get('condition', 'sunny'),
-                'humidity': demo_weather.get('humidity', 60),
-                'windSpeed': demo_weather.get('windSpeed', 10),
-                'precipitation': demo_weather.get('precipitation', 0),
-                'location': demo_weather.get('location', 'Demo Location')
-            }
-        else:
-            # Try to get real weather data
-            weather_data = {
-                'temperature': 22,
-                'condition': 'partly cloudy',
-                'humidity': 55,
-                'windSpeed': 12,
-                'precipitation': 0
-            }
+        logger.info(f"Recording worn outfit for user {user_id}")
+        logger.info(f"Outfit data: {outfit_data}")
         
-        # Generate recommendations for all occasions
-        recommendations = {}
+        # Validate outfit data
+        if not outfit_data or not outfit_data.get('items'):
+            raise HTTPException(status_code=400, detail="Outfit data and items are required")
         
-        for occasion in occasions:
+        # Use outfit history service if available
+        if outfit_history_service:
             try:
-                outfit = enhanced_outfit_service.generate_outfit_recommendation(
+                result = outfit_history_service.record_worn_outfit(
                     user_id=user_id,
-                    weather_data=weather_data,
-                    occasion=occasion
+                    outfit_data=outfit_data,
+                    occasion=occasion,
+                    weather=weather,
+                    location=location,
+                    worn_date=worn_date
                 )
-                recommendations[occasion] = outfit
+                
+                if result:
+                    return {
+                        "status": "success",
+                        "message": "Outfit wear recorded successfully",
+                        "outfit_id": result.get('outfit_id'),
+                        "worn_date": str(worn_date),
+                        "user_id": user_id
+                    }
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to record outfit wear")
+                    
             except Exception as e:
-                logger.warning(f"Failed to generate {occasion} outfit: {e}")
-                recommendations[occasion] = {
-                    'error': f'Failed to generate {occasion} outfit',
-                    'message': str(e),
-                    'items': [],
-                    'confidence': 0
+                logger.error(f"Outfit history service error: {e}")
+                # Fall back to simple response
+                return {
+                    "status": "success",
+                    "message": "Outfit noted (limited tracking)",
+                    "user_id": user_id,
+                    "fallback": True
                 }
-        
-        # Get wardrobe analysis
-        wardrobe_items = enhanced_outfit_service.get_user_wardrobe_items(user_id)
-        analysis = enhanced_outfit_service._analyze_wardrobe_for_occasions(wardrobe_items, recommendations)
-        
-        return {
-            "status": "success",
-            "recommendations": recommendations,
-            "wardrobe_analysis": analysis,
-            "weather": weather_data,
-            "total_items": len(wardrobe_items),
-            "message": f"Generated {len(recommendations)} enhanced outfit recommendations"
-        }
-        
+        else:
+            # Outfit history service not available, return success anyway
+            logger.warning("Outfit history service not available")
+            return {
+                "status": "success", 
+                "message": "Outfit noted (tracking disabled)",
+                "user_id": user_id,
+                "service_available": False
+            }
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Enhanced recommendations error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate enhanced recommendations")
+        logger.exception("Record worn outfit error")
+        raise HTTPException(status_code=500, detail="Failed to record outfit wear")
 
-# Trip Planner Routes - Enhanced with AI Service
+# Trip Planning Routes (Protected)
 @app.post("/api/trip-planner/enhanced-packing")
-async def enhanced_packing_recommendations(request_data: dict):
-    """Generate enhanced packing recommendations with wardrobe integration"""
+async def enhanced_packing_recommendations(request_data: dict, current_user: dict = Depends(get_current_user)):
+    """Generate enhanced packing recommendations with wardrobe integration (protected)"""
     try:
-        logger.info("Processing enhanced packing request...")
+        user_id = current_user["user_id"]
+        logger.info(f"Processing enhanced packing request for user {user_id}...")
         
         trip_details = request_data.get('tripDetails', {})
         wardrobe_items = request_data.get('wardrobeItems', [])
@@ -949,7 +1220,7 @@ async def enhanced_packing_recommendations(request_data: dict):
         logger.info(f"Wardrobe items count: {len(wardrobe_items)}")
         logger.info(f"Duration: {duration}")
         
-        # Use the new AI trip generator for intelligent analysis
+        # Use the AI trip generator for intelligent analysis
         if trip_ai_generator.ai_loaded:
             logger.info("Using AI-powered trip planning")
             recommendations = trip_ai_generator.generate_intelligent_packing_list(trip_details, wardrobe_items, duration)
@@ -975,7 +1246,8 @@ async def enhanced_packing_recommendations(request_data: dict):
             "wardrobeMatches": wardrobe_matches,
             "analysis": wardrobe_analysis,
             "coverage": coverage,
-            "message": "Smart packing list generated with AI analysis"
+            "message": "Smart packing list generated with AI analysis",
+            "user_id": user_id
         }
         
     except Exception as e:
@@ -985,9 +1257,10 @@ async def enhanced_packing_recommendations(request_data: dict):
         raise HTTPException(status_code=500, detail=f"Failed to generate enhanced recommendations: {str(e)}")
 
 @app.get("/api/trips")
-async def get_user_trips(user_id: int = 1):
-    """Get user's saved trips"""
+async def get_user_trips(current_user: dict = Depends(get_current_user)):
+    """Get user's saved trips (protected)"""
     try:
+        user_id = current_user["user_id"]
         logger.info(f"Getting trips for user: {user_id}")
         
         # Use the trip service to get from database
@@ -996,17 +1269,20 @@ async def get_user_trips(user_id: int = 1):
         return {
             "status": "success",
             "trips": trips,
-            "count": len(trips)
+            "count": len(trips),
+            "user_id": user_id
         }
     except Exception as e:
         logger.error(f"Get trips error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve trips: {str(e)}")
 
 @app.post("/api/trips")
-async def save_trip(trip_data: dict):
-    """Save trip details and packing list"""
+async def save_trip(trip_data: dict, current_user: dict = Depends(get_current_user)):
+    """Save trip details and packing list (protected)"""
     try:
-        logger.info(f"Saving trip: {trip_data.get('destination', 'Unknown')}")
+        user_id = current_user["user_id"]
+        trip_data['user_id'] = user_id  # Ensure trip belongs to authenticated user
+        logger.info(f"Saving trip for user {user_id}: {trip_data.get('destination', 'Unknown')}")
         
         # Use the trip service to save to database
         result = trip_service.save_trip(trip_data)
@@ -1014,16 +1290,17 @@ async def save_trip(trip_data: dict):
         return {
             "status": "success",
             "trip_id": result["id"],
-            "message": "Trip saved successfully to database"
+            "message": "Trip saved successfully to database",
+            "user_id": user_id
         }
     except Exception as e:
         logger.error(f"Save trip error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save trip: {str(e)}")
 
-# Weather Integration (Mock for now - can be enhanced with real weather API)
+# Weather Integration
 @app.get("/api/weather/{lat}/{lon}")
 async def get_weather_data(lat: float, lon: float):
-    """Get weather data for coordinates"""
+    """Get weather data for coordinates (public endpoint)"""
     try:
         # Use the real weather service
         weather_data = weather_service.get_current_weather(lat, lon)
@@ -1037,607 +1314,7 @@ async def get_weather_data(lat: float, lon: float):
         logger.error(f"Weather data error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get weather data")
 
-# Backward compatibility routes
-@app.get("/wardrobe/items")
-async def get_wardrobe_items_compat(user_id: int = 1):
-    return await get_wardrobe_items(user_id)
-
-@app.post("/wardrobe/items")
-async def add_wardrobe_item_compat(item_data: dict):
-    return await add_wardrobe_item(item_data)
-
-# Legacy outfit endpoints (for backward compatibility)
-@app.post("/api/outfit/generate")
-async def generate_ai_outfit_legacy(request_data: dict):
-    """Legacy outfit generation endpoint - redirects to new AI recommendation"""
-    return await get_ai_outfit_recommendation(request_data)
-
-@app.post("/api/outfit/feedback")
-async def process_outfit_feedback(feedback_data: dict):
-    """Process user feedback for machine learning (placeholder implementation)"""
-    try:
-        user_id = feedback_data.get('user_id')
-        outfit_id = feedback_data.get('outfit_id')
-        feedback_type = feedback_data.get('feedback_type')  # 'like', 'dislike', 'worn'
-        
-        logger.info(f"Processing feedback: User {user_id}, Outfit {outfit_id}, Type: {feedback_type}")
-        
-        # TODO: Implement actual feedback processing and machine learning
-        # For now, just log the feedback
-        return {
-            "status": "success",
-            "message": "Feedback processed successfully - AI will learn from your preferences"
-        }
-        
-    except Exception as e:
-        logger.error(f"Feedback processing error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process feedback")
-
-# Outfit History Routes
-@app.post("/api/outfit/wear")
-async def record_worn_outfit(request_data: dict):
-    """Record that user wore a specific outfit"""
-    try:
-        if not outfit_history_service:
-            raise HTTPException(status_code=503, detail="Outfit history service not available")
-        
-        outfit_data = request_data.get('outfit_data', {})
-        user_id = request_data.get('user_id', 1)
-        occasion = request_data.get('occasion')
-        weather = request_data.get('weather')
-        location = request_data.get('location')
-        worn_date = request_data.get('worn_date')
-        
-        if not outfit_data:
-            raise HTTPException(status_code=400, detail="Outfit data is required")
-        
-        logger.info(f"Recording worn outfit for user {user_id}")
-        
-        result = outfit_history_service.record_worn_outfit(
-            outfit_data=outfit_data,
-            user_id=user_id,
-            occasion=occasion,
-            weather=weather,
-            location=location,
-            worn_date=worn_date
-        )
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Record worn outfit error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to record outfit: {str(e)}")
-
-@app.post("/api/outfit/regenerate-item")
-async def regenerate_single_item(request_data: dict):
-    """Regenerate a single item while keeping others in the outfit"""
-    try:
-        current_outfit = request_data.get('current_outfit', {})
-        item_category = request_data.get('item_category')  # e.g., 'tops', 'bottoms', 'shoes'
-        occasion = request_data.get('occasion', 'casual')
-        user_id = request_data.get('user_id', 1)
-        
-        if not current_outfit or not item_category:
-            raise HTTPException(status_code=400, detail="Current outfit and item category are required")
-        
-        logger.info(f"Regenerating {item_category} for user {user_id}, occasion: {occasion}")
-        
-        # Get user's wardrobe items
-        wardrobe_items = wardrobe_service.get_wardrobe_items()
-        
-        # Filter items by category
-        category_items = [item for item in wardrobe_items if item.get('category', '').lower() == item_category.lower()]
-        
-        if not category_items:
-            return {
-                "status": "error",
-                "message": f"No {item_category} items found in wardrobe"
-            }
-        
-        # Get current items in outfit (excluding the one we're replacing)
-        current_items = current_outfit.get('items', [])
-        
-        # Find the current item being replaced to exclude it
-        current_item_id = None
-        for item in current_items:
-            if item.get('category', '').lower() == item_category.lower():
-                current_item_id = item.get('id')
-                break
-        
-        # Filter items by category and exclude current item
-        category_items = [
-            item for item in wardrobe_items 
-            if item.get('category', '').lower() == item_category.lower() 
-            and item.get('id') != current_item_id  # Exclude current item
-        ]
-        
-        if not category_items:
-            return {
-                "status": "error",
-                "message": f"No alternative {item_category} items found in wardrobe"
-            }
-        
-        logger.info(f"Found {len(category_items)} alternative {item_category} items (excluding current)")
-        
-        # Find items that match the current outfit style and occasion
-        suitable_items = []
-        for item in category_items:
-            # Basic compatibility check (can be enhanced with AI)
-            item_occasions = item.get('suitable_occasions', [])
-            if not item_occasions or occasion in item_occasions:
-                suitable_items.append(item)
-        
-        if not suitable_items:
-            # If no suitable items found, use all category items (already excludes current)
-            suitable_items = category_items
-        
-        if not suitable_items:
-            return {
-                "status": "error",
-                "message": f"No alternative {item_category} items available"
-            }
-        
-        # Select a random item to ensure variety
-        import random
-        new_item = random.choice(suitable_items)
-        
-        # Create the updated outfit
-        updated_items = []
-        item_replaced = False
-        
-        for item in current_items:
-            if item.get('category', '').lower() == item_category.lower():
-                # Replace with new item
-                updated_items.append({
-                    'id': new_item.get('id'),
-                    'name': new_item.get('name'),
-                    'category': new_item.get('category'),
-                    'image_path': new_item.get('image_path'),
-                    'image_url': f"/static/images/wardrobe/{new_item.get('image_path')}" if new_item.get('image_path') else None,
-                    'color': new_item.get('color'),
-                    'brand': new_item.get('brand')
-                })
-                item_replaced = True
-            else:
-                # Keep existing item
-                updated_items.append(item)
-        
-        # If no item was replaced, add the new item
-        if not item_replaced:
-            updated_items.append({
-                'id': new_item.get('id'),
-                'name': new_item.get('name'),
-                'category': new_item.get('category'),
-                'image_path': new_item.get('image_path'),
-                'image_url': f"/static/images/wardrobe/{new_item.get('image_path')}" if new_item.get('image_path') else None,
-                'color': new_item.get('color'),
-                'brand': new_item.get('brand')
-            })
-        
-        # Calculate new confidence (basic algorithm)
-        # TODO: Enhance with AI-based compatibility scoring
-        base_confidence = current_outfit.get('confidence', 85)
-        new_confidence = max(75, min(95, base_confidence + (5 if len(suitable_items) > 3 else -5)))
-        
-        updated_outfit = {
-            'id': current_outfit.get('id', 'updated'),
-            'items': updated_items,
-            'confidence': new_confidence,
-            'reason': f"Updated {item_category} for better style match",
-            'occasion': occasion
-        }
-        
-        logger.info(f"Successfully regenerated {item_category}: {new_item.get('name')}")
-        
-        return {
-            "status": "success",
-            "outfit": updated_outfit,
-            "replaced_item": {
-                'category': item_category,
-                'new_item': new_item.get('name'),
-                'alternatives_available': len(suitable_items) - 1
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Regenerate item error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to regenerate item: {str(e)}")
-
-@app.get("/api/outfit/history")
-async def get_outfit_history(user_id: int = 1, limit: int = 50, start_date: str = None, end_date: str = None):
-    """Get user's outfit history"""
-    try:
-        if not outfit_history_service:
-            raise HTTPException(status_code=503, detail="Outfit history service not available")
-        
-        logger.info(f"Getting outfit history for user {user_id}")
-        
-        result = outfit_history_service.get_user_outfit_history(
-            user_id=user_id,
-            limit=limit,
-            start_date=start_date,
-            end_date=end_date
-        )
-        
-        # Debug logging
-        if result.get('history'):
-            logger.info(f"Returning {len(result['history'])} outfit history entries")
-            for i, entry in enumerate(result['history'][:2]):  # Log first 2 entries
-                logger.info(f"Entry {i}: outfit_data type = {type(entry.get('outfit_data'))}")
-                logger.info(f"Entry {i}: outfit_data = {entry.get('outfit_data')}")
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Get outfit history error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit history: {str(e)}")
-
-@app.get("/api/outfit/history/{worn_date}")
-async def get_outfit_by_date(worn_date: str, user_id: int = 1):
-    """Get outfit worn on a specific date"""
-    try:
-        if not outfit_history_service:
-            raise HTTPException(status_code=503, detail="Outfit history service not available")
-        
-        logger.info(f"Getting outfit for user {user_id} on {worn_date}")
-        
-        result = outfit_history_service.get_outfit_by_date(
-            worn_date=worn_date,
-            user_id=user_id
-        )
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Get outfit by date error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
-
-@app.post("/api/outfit/rate")
-async def rate_outfit(request_data: dict):
-    """Rate a worn outfit"""
-    try:
-        if not outfit_history_service:
-            raise HTTPException(status_code=503, detail="Outfit history service not available")
-        
-        outfit_id = request_data.get('outfit_id')
-        rating = request_data.get('rating')
-        notes = request_data.get('notes')
-        
-        if not outfit_id or not rating:
-            raise HTTPException(status_code=400, detail="Outfit ID and rating are required")
-        
-        logger.info(f"Rating outfit {outfit_id} with {rating} stars")
-        
-        result = outfit_history_service.rate_outfit(
-            outfit_id=outfit_id,
-            rating=rating,
-            notes=notes
-        )
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Rate outfit error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to rate outfit: {str(e)}")
-
-@app.get("/api/outfit/recommendations/{user_id}")
-async def get_daily_recommendations(user_id: int, lat: float = 40.7128, lon: float = -74.0060):
-    """Get daily outfit recommendations for user"""
-    try:
-        # Get weather data (mock for now)
-        weather_data = {
-            'temperature': 22,
-            'condition': 'partly cloudy',
-            'humidity': 55,
-            'windSpeed': 12,
-            'precipitation': 0
-        }
-        
-        # Generate recommendations for different occasions
-        occasions = ['casual', 'business', 'workout']
-        daily_recommendations = {}
-        
-        for occasion in occasions:
-            try:
-                outfit = enhanced_outfit_service.generate_outfit_recommendation(
-                    user_id=user_id,
-                    weather_data=weather_data,
-                    occasion=occasion
-                )
-                if not outfit.get('error'):
-                    daily_recommendations[occasion] = outfit
-            except Exception as e:
-                logger.warning(f"Failed to generate {occasion} recommendation: {e}")
-        
-        return {
-            "status": "success",
-            "recommendations": daily_recommendations,
-            "weather": weather_data,
-            "user_id": user_id
-        }
-        
-    except Exception as e:
-        logger.error(f"Daily recommendations error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get daily recommendations")
-
-# Additional utility endpoints
-@app.get("/api/outfit/occasions")
-async def get_available_occasions():
-    """Get list of available occasions for outfit recommendations"""
-    occasions = [
-        {
-            "id": "casual",
-            "name": "Casual",
-            "description": "Relaxed, everyday wear",
-            "formality_range": [1, 4]
-        },
-        {
-            "id": "business",
-            "name": "Business",
-            "description": "Professional work attire",
-            "formality_range": [5, 7]
-        },
-        {
-            "id": "formal",
-            "name": "Formal",
-            "description": "Dressy events and special occasions",
-            "formality_range": [8, 10]
-        },
-        {
-            "id": "workout",
-            "name": "Workout",
-            "description": "Athletic and gym wear",
-            "formality_range": [1, 3]
-        },
-        {
-            "id": "date",
-            "name": "Date Night",
-            "description": "Romantic occasions",
-            "formality_range": [6, 9]
-        }
-    ]
-    
-    return {
-        "status": "success",
-        "occasions": occasions
-    }
-
-@app.get("/api/outfit/color-analysis")
-async def get_color_analysis():
-    """Get color harmony rules and recommendations"""
-    try:
-        color_rules = enhanced_outfit_service.color_harmony_rules
-        
-        return {
-            "status": "success",
-            "color_analysis": {
-                "complementary_pairs": color_rules['complementary_pairs'],
-                "neutral_colors": color_rules['neutral_colors'],
-                "warm_colors": color_rules['warm_colors'],
-                "cool_colors": color_rules['cool_colors'],
-                "seasonal_palettes": color_rules['seasonal_palettes'],
-                "tips": [
-                    "Neutral colors go with almost everything",
-                    "Complementary colors create striking combinations",
-                    "Monochromatic outfits are always safe",
-                    "Add one pop of color to neutral outfits"
-                ]
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Color analysis error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get color analysis")
-
-@app.post("/api/outfit/validate-combination")
-async def validate_outfit_combination(combination_data: dict):
-    """Validate if clothing items work well together"""
-    try:
-        items = combination_data.get('items', [])
-        occasion = combination_data.get('occasion', 'casual')
-        weather_data = combination_data.get('weather', {
-            'temperature': 22,
-            'condition': 'partly cloudy'
-        })
-        
-        if len(items) < 2:
-            return {
-                "status": "error",
-                "message": "Need at least 2 items to validate combination"
-            }
-        
-        # Calculate combination score
-        total_score = 0
-        feedback = []
-        
-        # Check color harmony
-        colors = [item.get('color', 'unknown') for item in items]
-        color_harmony = enhanced_outfit_service._calculate_color_harmony(items)
-        total_score += color_harmony
-        
-        if color_harmony > 3:
-            feedback.append("Great color combination!")
-        elif color_harmony > 1:
-            feedback.append("Good color harmony")
-        else:
-            feedback.append("Consider adjusting color combination")
-        
-        # Check formality consistency
-        formality_scores = [item.get('formality_score', 5) for item in items]
-        formality_range = max(formality_scores) - min(formality_scores)
-        
-        if formality_range <= 2:
-            feedback.append("Consistent formality level")
-            total_score += 15
-        elif formality_range <= 4:
-            feedback.append("Minor formality mismatch")
-            total_score += 10
-        else:
-            feedback.append("Significant formality mismatch - consider adjusting")
-            total_score += 5
-        
-        # Weather appropriateness
-        weather_score = 0
-        for item in items:
-            item_score = enhanced_outfit_service.calculate_item_compatibility_score(
-                item, weather_data, occasion
-            )
-            weather_score += item_score
-        
-        weather_score = weather_score / len(items)
-        total_score += weather_score * 0.5
-        
-        if weather_score > 80:
-            feedback.append("Perfect for current weather")
-        elif weather_score > 60:
-            feedback.append("Good weather match")
-        else:
-            feedback.append("May not be ideal for current weather")
-        
-        # Final score
-        final_score = min(100, int(total_score))
-        
-        return {
-            "status": "success",
-            "validation": {
-                "score": final_score,
-                "feedback": feedback,
-                "color_harmony_score": color_harmony,
-                "formality_consistency": formality_range <= 2,
-                "weather_appropriateness": weather_score,
-                "recommendation": "Excellent combination!" if final_score > 80 else 
-                                "Good combination" if final_score > 60 else 
-                                "Consider some adjustments"
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Outfit validation error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to validate outfit combination")
-
-# Favorite outfit endpoints
-@app.post("/api/outfit/favorites/save")
-async def save_favorite_outfit(request_data: dict):
-    """Save an outfit as favorite"""
-    try:
-        user_id = request_data.get('user_id', 1)
-        outfit_data = request_data.get('outfit_data', {})
-        outfit_name = request_data.get('outfit_name')
-        
-        if not outfit_data or not outfit_data.get('items'):
-            raise HTTPException(status_code=400, detail="Outfit data is required")
-        
-        logger.info(f"Saving favorite outfit for user {user_id}")
-        
-        result = favorite_outfit_service.save_favorite_outfit(
-            user_id=user_id,
-            outfit_data=outfit_data,
-            outfit_name=outfit_name
-        )
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Save favorite outfit error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save favorite outfit: {str(e)}")
-
-@app.get("/api/outfit/favorites/{user_id}")
-async def get_user_favorites(user_id: int):
-    """Get all favorite outfits for a user"""
-    try:
-        logger.info(f"Getting favorite outfits for user {user_id}")
-        
-        favorites = favorite_outfit_service.get_user_favorites(user_id)
-        
-        return {
-            "status": "success",
-            "favorites": favorites,
-            "count": len(favorites)
-        }
-        
-    except Exception as e:
-        logger.error(f"Get favorites error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get favorites: {str(e)}")
-
-@app.get("/api/outfit/favorites/{user_id}/{favorite_id}")
-async def get_favorite_by_id(user_id: int, favorite_id: int):
-    """Get a specific favorite outfit"""
-    try:
-        favorite = favorite_outfit_service.get_favorite_by_id(user_id, favorite_id)
-        
-        if not favorite:
-            raise HTTPException(status_code=404, detail="Favorite outfit not found")
-        
-        return {
-            "status": "success",
-            "favorite": favorite
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Get favorite by ID error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get favorite: {str(e)}")
-
-@app.put("/api/outfit/favorites/{user_id}/{favorite_id}")
-async def update_favorite_outfit(user_id: int, favorite_id: int, request_data: dict):
-    """Update a favorite outfit"""
-    try:
-        logger.info(f"Updating favorite outfit {favorite_id} for user {user_id}")
-        
-        result = favorite_outfit_service.update_favorite(
-            user_id=user_id,
-            favorite_id=favorite_id,
-            updates=request_data
-        )
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Update favorite error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update favorite: {str(e)}")
-
-@app.delete("/api/outfit/favorites/{user_id}/{favorite_id}")
-async def delete_favorite_outfit(user_id: int, favorite_id: int):
-    """Delete a favorite outfit"""
-    try:
-        logger.info(f"Deleting favorite outfit {favorite_id} for user {user_id}")
-        
-        result = favorite_outfit_service.delete_favorite(user_id, favorite_id)
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Delete favorite error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete favorite: {str(e)}")
-
-@app.post("/api/outfit/favorites/{user_id}/{favorite_id}/wear")
-async def wear_favorite_outfit(user_id: int, favorite_id: int):
-    """Mark a favorite outfit as worn"""
-    try:
-        logger.info(f"Marking favorite outfit {favorite_id} as worn for user {user_id}")
-        
-        result = favorite_outfit_service.wear_favorite_outfit(user_id, favorite_id)
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Wear favorite outfit error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to mark outfit as worn: {str(e)}")
-
-# System information endpoints
+# System Information (Public)
 @app.get("/api/system/info")
 async def get_system_info():
     """Get system information and capabilities"""
@@ -1645,7 +1322,9 @@ async def get_system_info():
         "status": "success",
         "system_info": {
             "version": "2.0.0",
+            "authentication": "JWT",
             "features": {
+                "user_authentication": True,
                 "ai_clothing_analysis": True,
                 "smart_outfit_recommendations": True,
                 "weather_integration": True,
@@ -1667,92 +1346,20 @@ async def get_system_info():
         }
     }
 
-@app.get("/api/system/stats")
-async def get_system_stats():
-    """Get system usage statistics"""
-    try:
-        # Get basic stats from database
-        items = wardrobe_service.get_wardrobe_items()
-        
-        return {
-            "status": "success",
-            "stats": {
-                "total_wardrobe_items": len(items),
-                "total_analyses_performed": len(items),  # Simplified
-                "active_users": 1,  # Simplified for demo
-                "outfit_recommendations_generated": 0,  # Would track in production
-                "ai_analysis_accuracy": 87.5,
-                "system_uptime": "Online",
-                "last_updated": datetime.now().isoformat()
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"System stats error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get system stats")
-
-# Error handling for common issues
-@app.exception_handler(404)
-async def not_found_handler(request, exc):
-    return {
-        "status": "error",
-        "message": "Endpoint not found",
-        "available_endpoints": [
-            "/api/wardrobe/items",
-            "/api/analyze-clothing",
-            "/api/outfit/ai-recommendation",
-            "/api/outfit/wardrobe-analysis",
-            "/api/trip-planner/enhanced-packing"
-        ]
-    }
-
-@app.exception_handler(500)
-async def internal_error_handler(request, exc):
-    logger.error(f"Internal server error: {exc}")
-    return {
-        "status": "error",
-        "message": "Internal server error",
-        "suggestion": "Please try again or contact support if the issue persists"
-    }
-
-# Development and testing endpoints
-@app.get("/api/test/ai-recommendation")
-async def test_ai_recommendation():
-    """Test endpoint for AI recommendation system"""
-    try:
-        # Test with mock data
-        test_data = {
-            "user_id": 1,
-            "location": {"latitude": 40.7128, "longitude": -74.0060},
-            "occasion": "casual"
-        }
-        
-        result = await get_ai_outfit_recommendation(test_data)
-        
-        return {
-            "status": "success",
-            "test_result": "AI recommendation system working",
-            "sample_response": result
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "test_result": "AI recommendation system failed",
-            "error": str(e)
-        }
-
+# Testing endpoints (Development only)
 @app.post("/api/test/add-sample-wardrobe")
-async def add_sample_wardrobe():
-    """Add sample wardrobe items for testing"""
+async def add_sample_wardrobe(current_user: dict = Depends(get_current_user)):
+    """Add sample wardrobe items for testing (protected)"""
     try:
+        user_id = current_user["user_id"]
+        
         sample_items = [
             {
                 'name': 'Blue Cotton T-Shirt',
                 'category': 'tops',
                 'color': 'blue',
                 'season': 'summer',
-                'user_id': 1,
+                'user_id': user_id,
                 'confidence': 90.0
             },
             {
@@ -1760,7 +1367,7 @@ async def add_sample_wardrobe():
                 'category': 'bottoms', 
                 'color': 'black',
                 'season': 'all',
-                'user_id': 1,
+                'user_id': user_id,
                 'confidence': 85.0
             },
             {
@@ -1768,7 +1375,7 @@ async def add_sample_wardrobe():
                 'category': 'shoes',
                 'color': 'white', 
                 'season': 'all',
-                'user_id': 1,
+                'user_id': user_id,
                 'confidence': 88.0
             },
             {
@@ -1776,7 +1383,7 @@ async def add_sample_wardrobe():
                 'category': 'tops',
                 'color': 'red',
                 'season': 'summer',
-                'user_id': 1,
+                'user_id': user_id,
                 'confidence': 92.0
             },
             {
@@ -1784,7 +1391,7 @@ async def add_sample_wardrobe():
                 'category': 'bottoms',
                 'color': 'khaki',
                 'season': 'summer',
-                'user_id': 1,
+                'user_id': user_id,
                 'confidence': 87.0
             }
         ]
@@ -1795,43 +1402,21 @@ async def add_sample_wardrobe():
                 result = wardrobe_service.save_wardrobe_item(item)
                 if result:
                     added_count += 1
-                    logger.info(f"Added sample item: {item['name']}")
+                    logger.info(f"Added sample item for user {user_id}: {item['name']}")
             except Exception as e:
                 logger.error(f"Failed to add item {item['name']}: {e}")
                 
         return {
             "status": "success", 
             "message": f"Added {added_count} sample items to wardrobe",
-            "items_added": added_count
+            "items_added": added_count,
+            "user_id": user_id
         }
     except Exception as e:
         logger.error(f"Error adding sample wardrobe: {e}")
         return {
             "status": "error", 
             "message": str(e)
-        }
-
-@app.post("/api/recommendations/buy")
-async def get_buy_recommendations(request_data: dict):
-    """Get AI-powered buying recommendations based on user's wardrobe"""
-    try:
-        user_id = request_data.get('user_id', 1)
-        
-        # Initialize the recommendation service
-        recommendation_service = BuyRecommendationService()
-        
-        # Get recommendations with analytics
-        result = recommendation_service.get_recommendations_with_analytics(user_id)
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error getting buy recommendations: {e}")
-        return {
-            "status": "error",
-            "message": f"Failed to get recommendations: {str(e)}",
-            "recommendations": [],
-            "analytics": {}
         }
 
 # Mount static files for images - this should be done after all routes are defined

@@ -6,10 +6,10 @@ class FavoriteOutfitService {
   // Save an outfit as favorite
   async saveFavorite(userId, outfitData, outfitName) {
     try {
-      const response = await apiService.post('/api/outfit/favorites/save', {
-        user_id: userId,
+      const response = await apiService.post('/api/favorites', {
+        // Remove userId - backend gets it from JWT token
         outfit_data: outfitData,
-        outfit_name: outfitName
+        name: outfitName
       });
       return response;
     } catch (error) {
@@ -22,7 +22,8 @@ class FavoriteOutfitService {
   async getUserFavorites(userId) {
     try {
       console.log(`Getting favorites for user ${userId}`);
-      const response = await apiService.get(`/api/outfit/favorites/${userId}`);
+      // Remove userId from URL - backend gets it from JWT token
+      const response = await apiService.get('/api/favorites');
       return response;
     } catch (error) {
       console.error('Error getting user favorites:', error);
@@ -33,7 +34,8 @@ class FavoriteOutfitService {
   // Get a specific favorite outfit
   async getFavoriteById(userId, favoriteId) {
     try {
-      const response = await apiService.get(`/api/outfit/favorites/${userId}/${favoriteId}`);
+      // Remove userId from URL - backend gets it from JWT token
+      const response = await apiService.get(`/api/favorites/${favoriteId}`);
       return response;
     } catch (error) {
       console.error('Error getting favorite by ID:', error);
@@ -44,7 +46,8 @@ class FavoriteOutfitService {
   // Update a favorite outfit
   async updateFavorite(userId, favoriteId, updates) {
     try {
-      const response = await apiService.put(`/api/outfit/favorites/${userId}/${favoriteId}`, updates);
+      // Remove userId from URL - backend gets it from JWT token
+      const response = await apiService.put(`/api/favorites/${favoriteId}`, updates);
       return response;
     } catch (error) {
       console.error('Error updating favorite outfit:', error);
@@ -55,7 +58,8 @@ class FavoriteOutfitService {
   // Delete a favorite outfit
   async deleteFavorite(userId, favoriteId) {
     try {
-      const response = await apiService.delete(`/api/outfit/favorites/${userId}/${favoriteId}`);
+      // Remove userId from URL - backend gets it from JWT token
+      const response = await apiService.delete(`/api/favorites/${favoriteId}`);
       return response;
     } catch (error) {
       console.error('Error deleting favorite outfit:', error);
@@ -66,14 +70,13 @@ class FavoriteOutfitService {
   // Mark a favorite outfit as worn
   async wearFavorite(userId, favoriteId) {
     try {
-      const response = await apiService.post(`/api/outfit/favorites/${userId}/${favoriteId}/wear`);
+      const response = await apiService.post(`/api/favorites/${favoriteId}/wear`);
       return response;
     } catch (error) {
       console.error('Error marking favorite as worn:', error);
       throw error;
     }
   }
-
 }
 
 export default new FavoriteOutfitService();

@@ -22,17 +22,25 @@ class AuthService {
       console.log('Signup response:', response);
 
       if (response.status === 'success') {
-        // Store user data and token
-        this.currentUser = response.user;
-        this.token = response.token || 'mock_token';
-        
+        // Backend returns `access_token` — prefer that and fall back safely
+        const token = response.access_token || response.token || null;
+
+        // Store user data and token only when available
+        this.currentUser = response.user || null;
+        this.token = token;
+
         // Save to AsyncStorage for persistence
-        await AsyncStorage.setItem('user', JSON.stringify(response.user));
-        await AsyncStorage.setItem('token', this.token);
-        
+        if (this.currentUser) {
+          await AsyncStorage.setItem('user', JSON.stringify(this.currentUser));
+        }
+        if (typeof token === 'string' && token.length > 0) {
+          await AsyncStorage.setItem('access_token', token);
+        }
+
         return {
           success: true,
-          user: response.user,
+          user: this.currentUser,
+          access_token: token,
           message: response.message
         };
       } else {
@@ -63,16 +71,21 @@ class AuthService {
       console.log('Signin response:', response);
 
       if (response.status === 'success') {
-        this.currentUser = response.user;
-        this.token = response.token;
-        
-        // Save to AsyncStorage
-        await AsyncStorage.setItem('user', JSON.stringify(response.user));
-        await AsyncStorage.setItem('token', response.token);
-        
+        const token = response.access_token || response.token || null;
+        this.currentUser = response.user || null;
+        this.token = token;
+
+        if (this.currentUser) {
+          await AsyncStorage.setItem('user', JSON.stringify(this.currentUser));
+        }
+        if (typeof token === 'string' && token.length > 0) {
+          await AsyncStorage.setItem('access_token', token);
+        }
+
         return {
           success: true,
-          user: response.user,
+          user: this.currentUser,
+          access_token: token,
           message: response.message
         };
       } else {
@@ -96,9 +109,10 @@ class AuthService {
       this.currentUser = null;
       this.token = null;
       
-      // Clear AsyncStorage
+      // Clear AsyncStorage - remove both old 'token' and new 'access_token'
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('access_token');
       
       return { success: true };
     } catch (error) {
@@ -126,7 +140,8 @@ class AuthService {
   async loadUserFromStorage() {
     try {
       const userData = await AsyncStorage.getItem('user');
-      const token = await AsyncStorage.getItem('token');
+      // We standardized on `access_token` key
+      const token = await AsyncStorage.getItem('access_token');
       
       if (userData && token) {
         this.currentUser = JSON.parse(userData);

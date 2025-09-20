@@ -2,76 +2,74 @@
 import apiService from './apiService';
 
 class OutfitHistoryService {
-  async recordWornOutfit(outfitData, occasion = null, weather = null, location = null, wornDate = null) {
-    try {
-      const requestData = {
-        outfit_data: outfitData,
-        user_id: 1, // TODO: Get from user context
-        occasion,
-        weather,
-        location,
-        worn_date: wornDate
-      };
+async recordWornOutfit(outfitData, occasion = null, weather = null, location = null, wornDate = null) {
+  try {
+    const requestData = {
+      outfit_data: outfitData,
+      // Remove user_id: 1 - let backend get it from JWT token
+      occasion,
+      weather,
+      location,
+      worn_date: wornDate
+    };
 
-      console.log('Recording worn outfit:', requestData);
-
-      const response = await apiService.post('/api/outfit/wear', requestData);
-      
-      if (response.status === 'success') {
-        console.log('Outfit recorded successfully:', response);
-        return response;
-      } else {
-        throw new Error(response.message || 'Failed to record outfit');
-      }
-    } catch (error) {
-      console.error('Error recording worn outfit:', error);
-      throw error;
+    console.log('Recording worn outfit:', requestData);
+    const response = await apiService.post('/api/outfit/wear', requestData);
+    
+    if (response.status === 'success') {
+      console.log('Outfit recorded successfully:', response);
+      return response;
+    } else {
+      throw new Error(response.message || 'Failed to record outfit');
     }
+  } catch (error) {
+    console.error('Error recording worn outfit:', error);
+    throw error;
   }
+}
 
   async getOutfitHistory(limit = 50, startDate = null, endDate = null) {
-    try {
-      const params = new URLSearchParams({
-        user_id: '1', // TODO: Get from user context
-        limit: limit.toString()
-      });
+  try {
+    const params = new URLSearchParams({
+      limit: limit.toString()
+      // Remove the hardcoded user_id: '1' line
+    });
 
-      if (startDate) {
-        params.append('start_date', startDate);
-      }
-      if (endDate) {
-        params.append('end_date', endDate);
-      }
-
-      console.log('Getting outfit history with params:', params.toString());
-
-      const response = await apiService.get(`/api/outfit/history?${params.toString()}`);
-      
-      if (response.status === 'success') {
-        console.log('Outfit history retrieved:', response);
-        return response;
-      } else {
-        throw new Error(response.message || 'Failed to get outfit history');
-      }
-    } catch (error) {
-      console.error('Error getting outfit history:', error);
-      throw error;
+    if (startDate) {
+      params.append('start_date', startDate);
     }
-  }
+    if (endDate) {
+      params.append('end_date', endDate);
+    }
 
-  async getOutfitByDate(wornDate) {
-    try {
-      console.log('Getting outfit for date:', wornDate);
+    console.log('Getting outfit history with params:', params.toString());
 
-      const response = await apiService.get(`/api/outfit/history/${wornDate}?user_id=1`);
-      
-      console.log('Outfit by date response:', response);
+    const response = await apiService.get(`/api/outfit/history?${params.toString()}`);
+    
+    if (response.status === 'success') {
+      console.log('Outfit history retrieved:', response);
       return response;
-    } catch (error) {
-      console.error('Error getting outfit by date:', error);
-      throw error;
+    } else {
+      throw new Error(response.message || 'Failed to get outfit history');
     }
+  } catch (error) {
+    console.error('Error getting outfit history:', error);
+    throw error;
   }
+}
+  async getOutfitByDate(wornDate) {
+  try {
+    console.log('Getting outfit for date:', wornDate);
+    // Remove ?user_id=1 from the URL
+    const response = await apiService.get(`/api/outfit/history/${wornDate}`);
+    
+    console.log('Outfit by date response:', response);
+    return response;
+  } catch (error) {
+    console.error('Error getting outfit by date:', error);
+    throw error;
+  }
+}
 
   async rateOutfit(outfitId, rating, notes = null) {
     try {

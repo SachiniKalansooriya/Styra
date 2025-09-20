@@ -39,15 +39,20 @@ class AnalysisHistoryService:
     def save_analysis_result(self, analysis_result):
         """Save analysis result to database"""
         try:
+            import json
+            
             query = """
                 INSERT INTO analysis_history (analysis_type, result_data, confidence_score, created_at)
                 VALUES (%s, %s, %s, %s)
                 RETURNING id, created_at
             """
             
+            # Convert analysis_result to proper JSON string
+            result_json = json.dumps(analysis_result) if analysis_result else '{}'
+            
             result = db.execute_query(query, (
                 analysis_result.get('analysis_method', 'clothing_analysis'),
-                str(analysis_result),  # Convert to string for now
+                result_json,  # Use proper JSON string
                 analysis_result.get('confidence', 0),
                 datetime.now()
             ))

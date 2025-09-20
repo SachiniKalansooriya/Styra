@@ -3,6 +3,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Image,
   TextInput,
   TouchableOpacity,
   ScrollView,
@@ -52,18 +53,18 @@ export const SignUpScreen = ({ navigation, onAuthSuccess }) => {
 
       if (result.success) {
         Alert.alert(
-          'Success', 
+          'Success',
           result.message || 'Account created successfully!',
           [
-            { 
-              text: 'OK', 
+            {
+              text: 'OK',
               onPress: () => {
-                // Call the authentication success handler
-                if (onAuthSuccess) {
+                // If signup returned access_token, auto-authenticate user
+                if (result.access_token && onAuthSuccess) {
                   onAuthSuccess(result.user);
                 } else {
-                  // Fallback if no handler provided
-                  navigation.navigate('Home');
+                  // Fallback: navigate to Login screen
+                  navigation.navigate('Login');
                 }
               }
             }
@@ -111,10 +112,12 @@ export const SignUpScreen = ({ navigation, onAuthSuccess }) => {
           {/* Form Container */}
           <View style={styles.formContainer}>
             <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
-                <Icon name="style" size={35} color="#403c35" />
-              </View>
-              <Text style={styles.brandName}>Join Styra</Text>
+              <Image
+                            source={require('../../assets/styraicon.png')}
+                            style={styles.brandLogo}
+                            accessibilityLabel="Styra logo"
+                            resizeMode="contain"
+                          />
               <Text style={styles.tagline}>Start your style journey</Text>
             </View>
 
@@ -242,16 +245,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-    borderWidth: 2,
-    borderColor: '#d1cdc1',
+  brandLogo: {
+    width: 240,
+    height: 100,
+    marginBottom: 20,
+    marginTop: 50,
+
   },
   brandName: {
     fontSize: 28,

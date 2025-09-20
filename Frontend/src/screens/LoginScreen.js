@@ -3,6 +3,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Image,
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -73,17 +74,20 @@ export const LoginScreen = ({ navigation, onAuthSuccess }) => {
             <Icon name="arrow-back" size={20} color="#403c35" />
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Welcome Back</Text>
+          <View style={styles.headerCenter}>
+           
+            <Text style={styles.headerTitle}>Welcome Back</Text>
+             <Image
+              source={require('../../assets/styraicon.png')}
+              style={styles.brandLogo}
+              accessibilityLabel="Styra logo"
+              resizeMode="contain"
+            />
+          </View>
         </View>
 
         {/* Form Container */}
         <View style={styles.formContainer}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Icon name="style" size={35} color="#403c35" />
-            </View>
-            <Text style={styles.brandName}>Styra</Text>
-          </View>
 
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
@@ -158,7 +162,7 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: 50,
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   backButton: {
     flexDirection: 'row',
@@ -177,31 +181,34 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
+    marginTop: 50,
   },
   formContainer: {
     flex: 1,
     paddingHorizontal: 30,
     justifyContent: 'center',
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
+  brandLogo: {
+    width: 240,
+    height: 100,
+    marginBottom: 20,
+    marginTop: 100,
+
   },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 40,
+  headerCenter: {
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-    borderWidth: 2,
-    borderColor: '#d1cdc1',
+    // keep header content close together
+    marginTop: 6,
   },
-  brandName: {
-    fontSize: 32,
-    color: '#000',
-    fontWeight: 'bold',
+  backButton: {
+    position: 'absolute',
+    left: 10,
+    top: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    marginBottom: 10,
   },
   inputContainer: {
     marginBottom: 20,
