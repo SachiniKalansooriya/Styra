@@ -292,12 +292,12 @@ const SavedTripsScreen = ({ navigation }) => {
             style={styles.backButton}
             onPress={() => navigation.navigate('Home')}
           >
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
+            <Ionicons name="arrow-back" size={24} color="#8A724C" />
           </TouchableOpacity>
           <Text style={styles.title}>Saved Trips</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#8A724C" />
           <Text style={styles.loadingText}>Loading your trips...</Text>
         </View>
       </View>
@@ -314,14 +314,14 @@ const SavedTripsScreen = ({ navigation }) => {
             navigation.navigate('Home');
           }}
         >
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="arrow-back" size={24} color="#8A724C" />
         </TouchableOpacity>
         <Text style={styles.title}>Saved Trips</Text>
         <TouchableOpacity
           style={styles.refreshButton}
           onPress={onRefresh}
         >
-          <Ionicons name="refresh" size={24} color="#007AFF" />
+          <Ionicons name="refresh" size={24} color="#8A724C" />
         </TouchableOpacity>
       </View>
 
@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   planTripButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#8A724C',
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 25,

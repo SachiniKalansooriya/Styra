@@ -1,14 +1,8 @@
-// API Configuration
+// src/config/api.js
 const getApiUrl = () => {
-  // In development, you have multiple options:
-  // 1. Use your computer's IP (if firewall allows)
-  // 2. Use localhost when testing on web
-  // 3. Use Expo tunnel URL when using physical device
-  
   const isDevelopment = __DEV__ || true;
   
   if (isDevelopment) {
-    // Try multiple URLs for development
     return {
       primary: 'http://172.20.10.7:8000',     // Your ASUS laptop's IP
       fallback: 'http://localhost:8000',       // Won't work on phone, but useful for web
@@ -25,7 +19,7 @@ const getApiUrl = () => {
 
 const API_CONFIG = {
   ...getApiUrl(),
-  TIMEOUT: 10000, // 10 seconds
+  TIMEOUT: 30000, // Increased to 30 seconds for image uploads
   HEADERS: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

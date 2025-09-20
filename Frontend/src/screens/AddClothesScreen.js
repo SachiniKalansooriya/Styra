@@ -267,17 +267,6 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
     'Yellow', 'Pink', 'Purple', 'Brown', 'Orange', 'Beige',
     'Multicolor', 'Metallic', 'Pastel'
   ];
-  
-  const occasions = [
-    { key: 'casual', label: 'Casual', emoji: '🏡' },
-    { key: 'formal', label: 'Formal', emoji: '🎭' },
-    { key: 'business', label: 'Business', emoji: '💼' },
-    { key: 'athletic', label: 'Athletic', emoji: '🏋️' },
-    { key: 'beachwear', label: 'Beach', emoji: '🏖️' },
-    { key: 'party', label: 'Party', emoji: '🎉' },
-    { key: 'datenight', label: 'Date Night', emoji: '💕' },
-    { key: 'seasonal', label: 'Seasonal', emoji: '🍂' },
-  ];
 
   const seasons = [
     { key: 'all', label: 'All Seasons' },
@@ -496,33 +485,6 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
                       { color: itemDetails.season === season.key ? 'white' : theme.text }
                     ]}>
                       {season.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Occasion / Place to Wear</Text>
-              <View style={styles.seasonGrid}>
-                {occasions.map((occasion) => (
-                  <TouchableOpacity
-                    key={occasion.key}
-                    style={[
-                      styles.seasonButton,
-                      {
-                        backgroundColor: itemDetails.occasion === occasion.key 
-                          ? '#8A724C' 
-                          : 'rgba(255,255,255,0.2)',
-                      }
-                    ]}
-                    onPress={() => setItemDetails(prev => ({ ...prev, occasion: occasion.key }))}
-                  >
-                    <Text style={[
-                      styles.seasonText,
-                      { color: itemDetails.occasion === occasion.key ? 'white' : theme.text }
-                    ]}>
-                      {occasion.emoji} {occasion.label}
                     </Text>
                   </TouchableOpacity>
                 ))}

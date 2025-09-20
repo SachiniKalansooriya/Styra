@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   getOutfitButton: {
-    backgroundColor: '#FF8C42',
+    backgroundColor: '#8A724C',
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 25,

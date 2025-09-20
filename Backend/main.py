@@ -589,7 +589,9 @@ async def add_wardrobe_item(item_data: dict, current_user: dict = Depends(get_cu
         if 'suggestedColor' in item_data:
             item_data['color'] = item_data.pop('suggestedColor')
         if 'suggestedOccasion' in item_data:
-            item_data['season'] = item_data.pop('suggestedOccasion')
+            item_data.pop('suggestedOccasion')
+        if 'season' not in item_data or not item_data['season']:
+            item_data['season'] = 'all'
         
         # Save item to database
         logger.info(f"About to save wardrobe item with data: {item_data}")

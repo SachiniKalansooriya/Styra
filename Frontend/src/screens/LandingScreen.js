@@ -80,20 +80,6 @@ export const LandingScreen = ({ navigation, isAuthenticated = false, onLogout })
           >
             <Text style={styles.secondaryButtonText}>Login</Text>
           </TouchableOpacity>
-
-          {/* Optional: Show sign out option if user is authenticated */}
-          {isAuthenticated && (
-            <TouchableOpacity 
-              style={styles.skipButton}
-              onPress={() => {
-                if (onLogout) {
-                  onLogout();
-                }
-              }}
-            >
-              <Text style={styles.skipText}>Sign Out</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
       </View>

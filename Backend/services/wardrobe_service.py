@@ -1,3 +1,4 @@
+# services/wardrobe_service.py
 from datetime import datetime
 import logging
 from database.connection import db
@@ -14,10 +15,17 @@ class WardrobeService:
             name = str(item_data.get('name', 'Untitled Item')).strip()
             category = str(item_data.get('category', 'unknown')).strip()
             color = str(item_data.get('color', 'unknown')).strip()
-            season = str(item_data.get('season', 'all')).strip()
+            
+            # Handle season properly - only allow valid enum values
+            season = str(item_data.get('season', 'all')).strip().lower()
+            valid_seasons = ['spring', 'summer', 'fall', 'winter', 'all']
+            if season not in valid_seasons:
+                logger.warning(f"Invalid season value '{season}', defaulting to 'all'")
+                season = 'all'  # Default to 'all' for invalid values
+            
             image_path = item_data.get('image_path')
             
-            logger.info(f"Saving wardrobe item: name={name}, category={category}, color={color}")
+            logger.info(f"Saving wardrobe item: name={name}, category={category}, color={color}, season={season}")
             
             # Handle confidence field
             confidence = None
@@ -31,6 +39,9 @@ class WardrobeService:
             
             analysis_method = item_data.get('analysis_method')
             user_id = int(item_data.get('user_id', 1))
+            
+            # Remove any fields that might cause issues
+            # Don't pass occasion to database if it doesn't have an occasion column
             
             # Prepare the INSERT query
             query = """
@@ -50,8 +61,14 @@ class WardrobeService:
             logger.info(f"Database result: {result}")
             
             if result:
-                returned_id = result['id']
-                created_at = result['created_at']
+                # Handle both single dict and list responses
+                if isinstance(result, list) and len(result) > 0:
+                    result_data = result[0]
+                else:
+                    result_data = result
+                
+                returned_id = result_data['id']
+                created_at = result_data['created_at']
                 logger.info(f"Wardrobe item saved successfully with ID: {returned_id}")
                 return {
                     "item_id": str(returned_id),
@@ -94,7 +111,10 @@ class WardrobeService:
             
             if results:
                 items = []
-                for result in results:
+                # Handle both single item and list results
+                results_list = results if isinstance(results, list) else [results]
+                
+                for result in results_list:
                     item = dict(result)
                     # Convert integer ID to string for consistency
                     if 'id' in item:
@@ -102,6 +122,9 @@ class WardrobeService:
                     # Map image_path to image_url for frontend compatibility
                     if 'image_path' in item:
                         item['image_url'] = item['image_path']
+                    # Add default values for missing fields
+                    item['timesWorn'] = item.get('times_worn', 0)
+                    item['pendingSync'] = False  # Items from DB are synced
                     items.append(item)
                 
                 logger.info(f"Retrieved {len(items)} wardrobe items from database")
@@ -127,8 +150,13 @@ class WardrobeService:
             params = (item_id,)
             results = db.execute_query(query, params)
             
-            if results and len(results) > 0:
-                item = dict(results[0])
+            if results:
+                # Handle both single dict and list responses
+                if isinstance(results, list) and len(results) > 0:
+                    item = dict(results[0])
+                else:
+                    item = dict(results)
+                
                 # Convert integer ID to string
                 if 'id' in item:
                     item['id'] = str(item['id'])
@@ -164,6 +192,32 @@ class WardrobeService:
                 
         except Exception as e:
             logger.exception(f"Error deleting wardrobe item: {e}")
+            return False
+    
+    def get_user_wardrobe_items(self, user_id, limit=100):
+        """Get wardrobe items for a specific user"""
+        return self.get_wardrobe_items(limit=limit, user_id=user_id)
+    
+    def update_item_wear_count(self, item_id):
+        """Update the times worn count for an item"""
+        try:
+            query = """
+            UPDATE wardrobe_items 
+            SET times_worn = COALESCE(times_worn, 0) + 1, 
+                last_worn = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            RETURNING id, times_worn
+            """
+            result = db.execute_query(query, (item_id,))
+            
+            if result:
+                logger.info(f"Updated wear count for item {item_id}")
+                return True
+            return False
+            
+        except Exception as e:
+            logger.exception(f"Error updating wear count: {e}")
             return False
 
 # Create global instance
