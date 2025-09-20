@@ -31,6 +31,9 @@ engine = create_engine(
     echo=False  # Set to True for SQL query logging
 )
 
+# Create Base class for models
+Base = declarative_base()
+
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, date
 from typing import Dict, List, Any, Optional
 from database.connection import db
+from models.outfit_history import OutfitHistory
 
 logger = logging.getLogger(__name__)
 

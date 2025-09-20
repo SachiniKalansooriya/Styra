@@ -10,28 +10,34 @@ class WardrobeService:
     def save_wardrobe_item(self, item_data):
         """Save a wardrobe item to the database"""
         try:
-            # Extract data from item
-            name = item_data.get('name', 'Untitled Item')
-            category = item_data.get('category', 'unknown')
-            color = item_data.get('color', 'unknown')
-            season = item_data.get('season', 'all')
+            # Extract and validate data
+            name = str(item_data.get('name', 'Untitled Item')).strip()
+            category = str(item_data.get('category', 'unknown')).strip()
+            color = str(item_data.get('color', 'unknown')).strip()
+            season = str(item_data.get('season', 'all')).strip()
             image_path = item_data.get('image_path')
             
-            logger.info(f"Saving wardrobe item: name={name}, category={category}, color={color}, image_path={image_path}")
+            logger.info(f"Saving wardrobe item: name={name}, category={category}, color={color}")
             
-            # Analysis-related fields
-            confidence = float(item_data.get('confidence', 0.0)) if item_data.get('confidence') else None
-            analysis_method = item_data.get('analysis_method', None)
+            # Handle confidence field
+            confidence = None
+            if item_data.get('confidence') is not None:
+                try:
+                    confidence = float(item_data.get('confidence'))
+                    confidence = max(0.0, min(1.0, confidence))
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid confidence value: {item_data.get('confidence')}, error: {e}")
+                    confidence = None
             
-            # User ID (default to 1 for now)
-            user_id = item_data.get('user_id', 1)
+            analysis_method = item_data.get('analysis_method')
+            user_id = int(item_data.get('user_id', 1))
             
-            # Insert into the database
+            # Prepare the INSERT query
             query = """
             INSERT INTO wardrobe_items 
-            (user_id, name, category, color, season, image_path, confidence, analysis_method)
+            (user_id, name, category, color, season, image_path, confidence, analysis_method, created_at)
             VALUES 
-            (%s, %s, %s, %s, %s, %s, %s, %s)
+            (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             RETURNING id, created_at
             """
             
@@ -41,35 +47,49 @@ class WardrobeService:
             
             logger.info(f"Executing query with params: {params}")
             result = db.execute_query(query, params)
+            logger.info(f"Database result: {result}")
             
-            if result and len(result) > 0:
-                returned_id = result[0]['id']
-                created_at = result[0]['created_at']
-                logger.info(f"Wardrobe item saved successfully with ID: {returned_id}, image_path: {image_path}")
+            if result:
+                returned_id = result['id']
+                created_at = result['created_at']
+                logger.info(f"Wardrobe item saved successfully with ID: {returned_id}")
                 return {
                     "item_id": str(returned_id),
                     "created_at": created_at
                 }
             else:
-                logger.warning("Wardrobe item was not saved properly")
+                logger.error("No result returned from INSERT query")
                 return None
                 
         except Exception as e:
-            logger.error(f"Error saving wardrobe item: {e}")
+            logger.exception(f"Error saving wardrobe item: {e}")
             return None
     
-    def get_wardrobe_items(self, limit=100, offset=0):
+    def get_wardrobe_items(self, limit=100, offset=0, user_id=None):
         """Get wardrobe items from the database"""
         try:
-            query = """
-            SELECT id, user_id, name, category, color, season, image_path, 
-                   confidence, analysis_method, times_worn, last_worn, 
-                   created_at, updated_at
-            FROM wardrobe_items
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
-            """
-            params = (limit, offset)
+            if user_id:
+                query = """
+                SELECT id, user_id, name, category, color, season, image_path, 
+                       confidence, analysis_method, times_worn, last_worn, 
+                       created_at, updated_at
+                FROM wardrobe_items
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """
+                params = (user_id, limit, offset)
+            else:
+                query = """
+                SELECT id, user_id, name, category, color, season, image_path, 
+                       confidence, analysis_method, times_worn, last_worn, 
+                       created_at, updated_at
+                FROM wardrobe_items
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """
+                params = (limit, offset)
+                
             results = db.execute_query(query, params)
             
             if results:
@@ -91,7 +111,7 @@ class WardrobeService:
                 return []
                 
         except Exception as e:
-            logger.error(f"Error retrieving wardrobe items: {e}")
+            logger.exception(f"Error retrieving wardrobe items: {e}")
             return []
     
     def get_wardrobe_item_by_id(self, item_id):
@@ -121,7 +141,7 @@ class WardrobeService:
                 return None
                 
         except Exception as e:
-            logger.error(f"Error retrieving wardrobe item by ID: {e}")
+            logger.exception(f"Error retrieving wardrobe item by ID: {e}")
             return None
     
     def delete_wardrobe_item(self, item_id):
@@ -135,7 +155,7 @@ class WardrobeService:
             params = (item_id,)
             result = db.execute_query(query, params)
             
-            if result and len(result) > 0:
+            if result:
                 logger.info(f"Wardrobe item deleted from database: {item_id}")
                 return True
             else:
@@ -143,7 +163,7 @@ class WardrobeService:
                 return False
                 
         except Exception as e:
-            logger.error(f"Error deleting wardrobe item: {e}")
+            logger.exception(f"Error deleting wardrobe item: {e}")
             return False
 
 # Create global instance

@@ -592,7 +592,9 @@ async def add_wardrobe_item(item_data: dict, current_user: dict = Depends(get_cu
             item_data['season'] = item_data.pop('suggestedOccasion')
         
         # Save item to database
+        logger.info(f"About to save wardrobe item with data: {item_data}")
         result = wardrobe_service.save_wardrobe_item(item_data)
+        logger.info(f"Save result: {result}")
         if result:
             logger.info(f"Wardrobe item saved with ID: {result['item_id']}")
             return {
@@ -606,10 +608,11 @@ async def add_wardrobe_item(item_data: dict, current_user: dict = Depends(get_cu
                 }
             }
         else:
+            logger.error("Failed to save item to database - result is None")
             raise HTTPException(status_code=500, detail="Failed to save item to database")
             
     except Exception as e:
-        logger.error(f"Add wardrobe item error: {e}")
+        logger.exception(f"Add wardrobe item error: {e}")
         raise HTTPException(status_code=500, detail="Failed to add item")
 
 @app.delete("/api/wardrobe/items/{item_id}")
