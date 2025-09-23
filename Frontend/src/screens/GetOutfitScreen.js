@@ -54,59 +54,7 @@ const GetOutfitScreen = ({ navigation }) => {
     location: 'Getting location...'
   };
 
-  // Mock outfit data
-  const mockOutfits = {
-    casual: {
-      id: '1',
-      items: [
-        {
-          id: 'top1',
-          name: 'White Cotton T-Shirt',
-          category: 'Top',
-          image: 'https://via.placeholder.com/150',
-        },
-        {
-          id: 'bottom1',
-          name: 'Blue Denim Jeans',
-          category: 'Bottom',
-          image: 'https://via.placeholder.com/150',
-        },
-        {
-          id: 'shoes1',
-          name: 'White Sneakers',
-          category: 'Shoes',
-          image: 'https://via.placeholder.com/150',
-        },
-      ],
-      confidence: 92,
-      reason: 'Perfect for comfortable daily activities with sunny weather',
-    },
-    work: {
-      id: '2',
-      items: [
-        {
-          id: 'top2',
-          name: 'Blue Button Shirt',
-          category: 'Top',
-          image: 'https://via.placeholder.com/150',
-        },
-        {
-          id: 'bottom2',
-          name: 'Black Formal Pants',
-          category: 'Bottom',
-          image: 'https://via.placeholder.com/150',
-        },
-        {
-          id: 'shoes2',
-          name: 'Black Formal Shoes',
-          category: 'Shoes',
-          image: 'https://via.placeholder.com/150',
-        },
-      ],
-      confidence: 88,
-      reason: 'Professional look suitable for office meetings',
-    },
-  };
+ 
 
   useEffect(() => {
     requestLocationPermission();

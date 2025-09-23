@@ -816,7 +816,7 @@ async def get_wardrobe_stats(current_user: dict = Depends(get_current_user)):
     """Get wardrobe statistics (protected)"""
     try:
         user_id = current_user["user_id"]
-        items = wardrobe_service.get_wardrobe_items()  # Pass user_id in production
+        items = wardrobe_service.get_wardrobe_items(user_id=user_id)  # Pass user_id in production
         total_items = len(items)
         
         # Calculate category distribution

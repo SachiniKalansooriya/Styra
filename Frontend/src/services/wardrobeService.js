@@ -1,25 +1,72 @@
+// services/wardrobeService.js
 import apiService from './apiService';
 import { storage } from '../utils/storage';
 import connectionService from './connectionService';
 
 class WardrobeService {
+  async getWardrobeItems(filters = {}) {
+    try {
+      const isOnline = await connectionService.isBackendAvailable();
+      
+      if (isOnline) {
+        try {
+          // Your apiService already handles auth tokens automatically
+          // Just pass the filters as query parameters
+          const response = await apiService.get('/api/wardrobe/items', filters);
+          
+          console.log('Backend response:', response);
+          
+          // Extract the items array from the backend response
+          return response.items || [];
+          
+        } catch (error) {
+          console.log('Backend fetch failed, using local storage:', error.message);
+          
+          // If it's an auth error, throw it to let the UI handle it
+          if (error.message.includes('Authentication expired')) {
+            throw error;
+          }
+          
+          return await storage.getWardrobeItems();
+        }
+      } else {
+        return await storage.getWardrobeItems();
+      }
+    } catch (error) {
+      console.error('Error fetching wardrobe items:', error);
+      
+      // Re-throw auth errors so the UI can handle them
+      if (error.message.includes('Authentication expired')) {
+        throw error;
+      }
+      
+      return [];
+    }
+  }
+
   async addWardrobeItem(itemData) {
     try {
       const isOnline = await connectionService.isBackendAvailable();
       
       if (isOnline) {
         try {
+          // Your apiService handles auth automatically
           const response = await apiService.post('/api/wardrobe/items', itemData);
-          // Don't save locally when backend is available to prevent duplicates
           
           return {
             success: true,
-            data: response.item || response, // Handle both response formats
+            data: response.item || response,
             source: 'backend',
             message: 'Item saved to backend'
           };
         } catch (backendError) {
           console.log('Backend save failed, using local storage:', backendError.message);
+          
+          // If auth expired, throw the error
+          if (backendError.message.includes('Authentication expired')) {
+            throw backendError;
+          }
+          
           const localItem = await storage.addWardrobeItem(itemData);
           
           return {
@@ -46,25 +93,30 @@ class WardrobeService {
     }
   }
 
-  async getWardrobeItems(filters = {}) {
+  async deleteWardrobeItem(itemId) {
     try {
       const isOnline = await connectionService.isBackendAvailable();
       
       if (isOnline) {
         try {
-          const response = await apiService.get('/api/wardrobe/items', filters);
-          // Extract the items array from the backend response
-          return response.items || [];
+          // Add delete method to your apiService
+          await apiService.delete(`/api/wardrobe/items/${itemId}`);
+          return { success: true, source: 'backend' };
         } catch (error) {
-          console.log('Backend fetch failed, using local storage');
-          return await storage.getWardrobeItems();
+          console.log('Backend delete failed, using local storage');
+          
+          if (error.message.includes('Authentication expired')) {
+            throw error;
+          }
         }
-      } else {
-        return await storage.getWardrobeItems();
       }
+      
+      // Fallback to local storage
+      await storage.deleteWardrobeItem(itemId);
+      return { success: true, source: 'local' };
+      
     } catch (error) {
-      console.error('Error fetching wardrobe items:', error);
-      return [];
+      throw new Error(`Failed to delete item: ${error.message}`);
     }
   }
 }

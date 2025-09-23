@@ -110,6 +110,13 @@ class ApiService {
     });
   }
 
+  async delete(endpoint, options = {}) {
+  return this.request(endpoint, {
+    method: 'DELETE',
+    ...options,
+  });
+}
+
   async postFormData(endpoint, formData, options = {}) {
     return this.request(endpoint, {
       method: 'POST',

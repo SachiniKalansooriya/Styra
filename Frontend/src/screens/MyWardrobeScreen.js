@@ -15,52 +15,63 @@ import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../themes/ThemeProvider';
 import { storage } from '../utils/storage';
 import wardrobeService from '../services/wardrobeService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MyWardrobeScreen = ({ navigation, backendConnected }) => {
   const { theme } = useTheme();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userId, setUserId] = useState(null);
+  
   useEffect(() => {
-    loadWardrobe();
+    loadUserAndWardrobe();
   }, []);
 
   // In wardrobeService.js
   const loadUserAndWardrobe = async () => {
     try {
-      // Get user data from storage
-      const userData = await storage.getItem('user_data');
-      if (userData) {
-        const user = JSON.parse(userData);
-        setUserId(user.id);
-        await loadWardrobe(user.id);
-      } else {
-        console.error('No user data found');
-        // Redirect to login or handle unauthenticated state
+      // Check if user is authenticated
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        console.error('No authentication token found');
         navigation.navigate('Login');
+        return;
       }
+
+      // Load wardrobe items (backend will filter by user via JWT)
+      await loadWardrobe();
+      
     } catch (error) {
       console.error('Error loading user data:', error);
+      Alert.alert('Error', 'Please login again');
+      navigation.navigate('Login');
     }
   };
 
-  const loadWardrobe = async (user_id = null) => {
+  const loadWardrobe = async () => {
     try {
       setLoading(true);
-      // Pass user_id if available
-      const wardrobeItems = await wardrobeService.getWardrobeItems(user_id);
+      
+      // Backend automatically filters by user_id from JWT token
+      const wardrobeItems = await wardrobeService.getWardrobeItems();
       
       if (Array.isArray(wardrobeItems)) {
         setItems(wardrobeItems);
+        console.log(`Loaded ${wardrobeItems.length} items for current user`);
       } else {
         console.warn('Expected array but got:', typeof wardrobeItems, wardrobeItems);
         setItems([]);
       }
     } catch (error) {
       console.error('Error loading wardrobe:', error);
+      
+      if (error.message.includes('Authentication expired')) {
+        Alert.alert('Session Expired', 'Please login again');
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Error', 'Failed to load wardrobe items');
+      }
       setItems([]);
-      Alert.alert('Error', 'Failed to load wardrobe items');
     } finally {
       setLoading(false);
     }
@@ -68,33 +79,34 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadWardrobe(userId);
+    await loadWardrobe(); // This will automatically filter by user
     setRefreshing(false);
   };
 
   const deleteItem = async (itemId) => {
-    Alert.alert(
-      'Delete Item',
-      'Are you sure you want to delete this clothing item?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await storage.deleteWardrobeItem(itemId);
-              await loadWardrobe(); // Reload the list
-              Alert.alert('Success', 'Item deleted successfully');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete item');
-            }
+  Alert.alert(
+    'Delete Item',
+    'Are you sure you want to delete this clothing item?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            // Use the wardrobeService instead of storage directly
+            await wardrobeService.deleteWardrobeItem(itemId);
+            await loadWardrobe(); // Reload the list
+            Alert.alert('Success', 'Item deleted successfully');
+          } catch (error) {
+            console.error('Delete error:', error);
+            Alert.alert('Error', 'Failed to delete item');
           }
         }
-      ]
-    );
-  };
-
+      }
+    ]
+  );
+};
   const renderItem = (item) => {
     // Get the image URI - prioritize backend image_url, then fall back to local imageData
     const getImageUri = () => {
