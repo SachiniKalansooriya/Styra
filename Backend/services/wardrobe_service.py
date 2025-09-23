@@ -1,4 +1,3 @@
-# services/wardrobe_service.py
 from datetime import datetime
 import logging
 from database.connection import db

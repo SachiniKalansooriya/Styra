@@ -1,4 +1,3 @@
-# services/trip_ai_generator.py
 import logging
 import json
 from typing import Dict, List, Any, Optional

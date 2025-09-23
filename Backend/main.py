@@ -498,14 +498,17 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Failed to get user info")
 
 # Protected Wardrobe Endpoints
+
 @app.get("/api/wardrobe/items")
 async def get_wardrobe_items(current_user: dict = Depends(get_current_user)):
     """Get user's wardrobe items (protected)"""
     try:
-        logger.info(f"Getting wardrobe items for current_user: {current_user}")
         user_id = current_user["user_id"]
-        logger.info(f"Extracted user_id: {user_id}")
-        items = wardrobe_service.get_wardrobe_items()  # Pass user_id in production
+        logger.info(f"Getting wardrobe items for user: {user_id}")
+        
+        # FIX: Pass user_id to filter by user
+        items = wardrobe_service.get_wardrobe_items(user_id=user_id)
+        
         logger.info(f"Retrieved {len(items)} items from wardrobe service")
         return {
             "status": "success",
@@ -515,7 +518,7 @@ async def get_wardrobe_items(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.exception("Get wardrobe items error")
         raise HTTPException(status_code=500, detail="Failed to retrieve wardrobe items")
-
+    
 @app.post("/api/wardrobe/items")
 async def add_wardrobe_item(item_data: dict, current_user: dict = Depends(get_current_user)):
     """Add item to wardrobe with smart image path detection (protected)"""

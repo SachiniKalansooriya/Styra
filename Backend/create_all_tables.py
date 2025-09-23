@@ -1,4 +1,3 @@
-# create_all_tables.py
 """
 Complete database schema creation script for Styra AI Wardrobe App
 This script creates all tables based on the SQLAlchemy models in all_models.py

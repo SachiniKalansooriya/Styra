@@ -1,4 +1,3 @@
-# Backend/app/database/database.py
 """
 Database configuration and session management
 """

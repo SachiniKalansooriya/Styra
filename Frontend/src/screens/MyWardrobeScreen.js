@@ -21,18 +21,36 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
+  const [userId, setUserId] = useState(null);
   useEffect(() => {
     loadWardrobe();
   }, []);
 
-  const loadWardrobe = async () => {
+  // In wardrobeService.js
+  const loadUserAndWardrobe = async () => {
+    try {
+      // Get user data from storage
+      const userData = await storage.getItem('user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setUserId(user.id);
+        await loadWardrobe(user.id);
+      } else {
+        console.error('No user data found');
+        // Redirect to login or handle unauthenticated state
+        navigation.navigate('Login');
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const loadWardrobe = async (user_id = null) => {
     try {
       setLoading(true);
-      // Use wardrobeService instead of direct storage access
-      const wardrobeItems = await wardrobeService.getWardrobeItems();
+      // Pass user_id if available
+      const wardrobeItems = await wardrobeService.getWardrobeItems(user_id);
       
-      // Ensure we always have an array
       if (Array.isArray(wardrobeItems)) {
         setItems(wardrobeItems);
       } else {
@@ -41,7 +59,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
       }
     } catch (error) {
       console.error('Error loading wardrobe:', error);
-      setItems([]); // Set empty array on error
+      setItems([]);
       Alert.alert('Error', 'Failed to load wardrobe items');
     } finally {
       setLoading(false);
@@ -50,7 +68,7 @@ const MyWardrobeScreen = ({ navigation, backendConnected }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadWardrobe();
+    await loadWardrobe(userId);
     setRefreshing(false);
   };
 

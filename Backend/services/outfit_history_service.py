@@ -1,4 +1,3 @@
-# services/outfit_history_service.py
 import psycopg2
 import psycopg2.extras
 import logging

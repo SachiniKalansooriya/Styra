@@ -1,4 +1,3 @@
-# services/weather_service.py
 import requests
 import os
 from typing import Dict, List, Optional

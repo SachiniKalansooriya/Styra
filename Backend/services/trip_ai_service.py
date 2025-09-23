@@ -1,4 +1,3 @@
-# services/trip_ai_service.py
 import logging
 from typing import Dict, List, Any
 

@@ -1,4 +1,3 @@
-# services/buy_recommendation_service.py
 import json
 from typing import Dict, List, Any
 from datetime import datetime
@@ -71,7 +70,7 @@ class BuyRecommendationService:
                     colors[color] = colors.get(color, 0) + 1
                     total_times_worn += times_worn
                     
-                    # Process specific item types (like "denim jacket", "red trousers")
+                    # Process specific item types
                     key_item_types = {
                         "denim jacket": ["denim jacket", "jean jacket", "jeans jacket"],
                         "blazer": ["blazer", "suit jacket", "formal jacket"],

@@ -1,4 +1,3 @@
-# services/enhanced_outfit_service.py
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -268,8 +267,8 @@ class EnhancedOutfitService:
         # Category-based defaults if no keywords match
         category_defaults = {
             'formal': 8,
-            'dress': 6,  # Updated for datenight compatibility
-            'dresses': 6,  # Updated for datenight compatibility
+            'dress': 6,  
+            'dresses': 6,  
             'tops': 5,
             'bottoms': 5,
             'shoes': 5,
@@ -282,7 +281,7 @@ class EnhancedOutfitService:
             if cat in category_lower:
                 return score
         
-        return 5  # Default middle score
+        return 5  
     
     def _get_comfort_score(self, category: str) -> int:
         """Estimate comfort score 1-10"""
@@ -299,7 +298,7 @@ class EnhancedOutfitService:
             if key in category_lower:
                 return score
         
-        return 7  # Default
+        return 7  
     
     def _get_weather_compatibility(self, category: str) -> List[str]:
         """Get weather conditions this item is good for"""

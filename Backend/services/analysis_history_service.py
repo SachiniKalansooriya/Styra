@@ -1,4 +1,3 @@
-# Backend/services/analysis_history_service.py
 import logging
 from database.connection import db
 import uuid
@@ -13,13 +12,12 @@ class AnalysisHistoryService:
     def create_table(self):
         """Create analysis_history table if it doesn't exist"""
         try:
-            # Try to create uuid extension (ignore if it fails)
             try:
                 db.execute_query("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
             except Exception as e:
                 logger.warning(f"Could not create uuid-ossp extension: {e}")
             
-            # Table should already exist from setup script, but let's verify
+            # verify table
             query = """
                 CREATE TABLE IF NOT EXISTS analysis_history (
                     id SERIAL PRIMARY KEY,

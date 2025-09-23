@@ -1,4 +1,3 @@
-# Backend/services/trip_service.py
 import logging
 from database.connection import db
 from datetime import datetime
