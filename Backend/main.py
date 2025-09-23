@@ -15,7 +15,7 @@ from services.image_storage_service import image_storage_service
 from services.trip_ai_service import TripAIService
 from services.outfit_history_service import OutfitHistoryService
 from services.trip_ai_generator import trip_ai_generator
-from services.enhanced_outfit_service import enhanced_outfit_service
+from services.ai_enhanced_outfit_service import ai_enhanced_outfit_service as enhanced_outfit_service
 from services.favorite_outfit_service import favorite_outfit_service
 from services.weather_service import weather_service
 from services.trip_service import trip_service

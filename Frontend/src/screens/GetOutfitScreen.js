@@ -22,10 +22,10 @@ import weatherService from '../services/weatherService';
 
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
-  const [multiOutfits, setMultiOutfits] = useState(null); // New state for multiple recommendations
-  const [showMultiView, setShowMultiView] = useState(false); // Toggle between single and multi view
+  const [multiOutfits, setMultiOutfits] = useState(null);
+  const [showMultiView, setShowMultiView] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [regeneratingItem, setRegeneratingItem] = useState(null); // Track which item is being regenerated
+  const [regeneratingItem, setRegeneratingItem] = useState(null);
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [occasion, setOccasion] = useState('casual');
   const [location, setLocation] = useState(null);
@@ -54,14 +54,9 @@ const GetOutfitScreen = ({ navigation }) => {
     location: 'Getting location...'
   };
 
- 
-
   useEffect(() => {
     requestLocationPermission();
-    // Set immediate fallback outfit for testing
-    setCurrentOutfit(mockOutfits.casual);
-    // Weather will be loaded when location is obtained
-    // Then try to get real outfit
+    // Try to get real outfit when component loads
     generateOutfit();
   }, []);
 
@@ -79,18 +74,16 @@ const GetOutfitScreen = ({ navigation }) => {
     try {
       console.log('Requesting location permission and GPS coordinates...');
       
-      // Request location permission
       let { status } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(status);
       
       if (status === 'granted') {
         console.log('Location permission granted, getting GPS coordinates...');
         
-        // Use high accuracy location settings with extended timeout
         let locationData = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation, // Highest accuracy
-          timeout: 25000, // 25 seconds timeout for better GPS lock
-          maximumAge: 5000, // Don't use cached data older than 5 seconds
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeout: 25000,
+          maximumAge: 5000,
         });
 
         console.log('GPS coordinates obtained:', {
@@ -100,10 +93,9 @@ const GetOutfitScreen = ({ navigation }) => {
           timestamp: new Date(locationData.timestamp).toLocaleString()
         });
 
-        // Try multiple readings for better accuracy if the first one is poor
-        if (locationData.coords.accuracy > 100) { // If accuracy is poor (>100m)
+        if (locationData.coords.accuracy > 100) {
           console.log('GPS accuracy is poor, attempting second reading...');
-          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+          await new Promise(resolve => setTimeout(resolve, 3000));
           
           try {
             let betterLocation = await Location.getCurrentPositionAsync({
@@ -128,9 +120,8 @@ const GetOutfitScreen = ({ navigation }) => {
 
       } else {
         console.log('Location permission denied, using fallback location for Galle');
-        // Use Galle coordinates as fallback
         setLocation({
-          latitude: 6.0535, // Galle, Sri Lanka
+          latitude: 6.0535,
           longitude: 80.2210,
         });
         
@@ -142,7 +133,6 @@ const GetOutfitScreen = ({ navigation }) => {
             { 
               text: 'Enable Location', 
               onPress: () => {
-                // Try to request permission again
                 requestLocationPermission();
               }
             }
@@ -151,9 +141,8 @@ const GetOutfitScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Error with GPS location:', error);
-      // Fallback to Galle coordinates
       setLocation({
-        latitude: 6.0535, // Galle, Sri Lanka
+        latitude: 6.0535,
         longitude: 80.2210,
       });
       
@@ -174,7 +163,6 @@ const GetOutfitScreen = ({ navigation }) => {
         );
         
         if (weatherData.status === 'success' && weatherData.current) {
-          // Try to get accurate city name using reverse geocoding
           let cityName = null;
           try {
             cityName = await getAccurateCityName(location.latitude, location.longitude);
@@ -193,444 +181,376 @@ const GetOutfitScreen = ({ navigation }) => {
             icon: weatherData.current.icon,
           });
         } else {
-          // Fallback to loading state if API fails
           setWeatherInfo(defaultWeatherData);
         }
       } catch (error) {
         console.error('Error fetching weather:', error);
-        // Fallback to loading state if API fails
         setWeatherInfo(defaultWeatherData);
       }
     } else {
-      // Use loading state if no location available
       setWeatherInfo(defaultWeatherData);
     }
   };
 
-// Update the generateOutfit function in your GetOutfitScreen.js
-
-const generateOutfit = async () => {
-  setLoading(true);
-  
-  try {
-    let requestData;
+  const generateOutfit = async () => {
+    setLoading(true);
     
-    if (demoMode) {
-      // Demo mode: use manual temperature input
-      console.log('Demo mode: Using manual weather input', { 
-        temperature: demoTemperature, 
-        condition: demoCondition,
-        occasion 
-      });
+    try {
+      let requestData;
       
-      requestData = {
-        user_id: 1,
-        demo_weather: {
-          temperature: parseInt(demoTemperature),
+      if (demoMode) {
+        console.log('Demo mode: Using manual weather input', { 
+          temperature: demoTemperature, 
           condition: demoCondition,
-          humidity: 60, // Default demo values
-          windSpeed: 10,
-          precipitation: 0,
-          location: 'Demo Location'
-        },
-        occasion: occasion
-      };
-      
-      // Update weather info immediately for demo
-      setWeatherInfo({
-        temperature: parseInt(demoTemperature),
-        condition: demoCondition,
-        humidity: 60,
-        windSpeed: 10,
-        precipitation: 0,
-        location: 'Demo Mode',
-        icon: getWeatherIcon(demoCondition)
-      });
-      
-    } else {
-      // Real weather mode: use GPS location
-      const locationData = location || {
-        latitude: 37.7749,
-        longitude: -122.4194,
-      };
-      
-      console.log('Real weather mode: Using GPS location', { locationData, occasion });
-      
-      requestData = {
-        user_id: 1,
-        location: {
-          latitude: locationData.latitude,
-          longitude: locationData.longitude
-        },
-        occasion: occasion
-      };
-    }
-    
-    // Call your AI recommendation endpoint using apiService
-    const data = await apiService.post('/api/outfit/ai-recommendation', requestData);
-    
-    console.log('API Response:', data); // For debugging
-    
-    if (data.status === 'success' && data.outfit && !data.outfit.error) {
-      console.log('Setting outfit from API:', data.outfit);
-      setCurrentOutfit(data.outfit);
-      
-      // Fix weather data location to be a string instead of object
-      const weatherData = {
-        ...data.weather,
-        location: data.weather?.location?.name || data.weather?.location || 'Current Location'
-      };
-      setWeatherInfo(weatherData);
-    } else {
-      // Handle case where user has no wardrobe items
-      if (data.outfit?.error) {
-        console.log('API returned error:', data.outfit);
-        Alert.alert(
-          'Wardrobe Empty', 
-          data.outfit.message || 'Please add some clothes to your wardrobe first!',
-          [
-            { text: 'Add Clothes', onPress: () => navigation.navigate('AddClothes') },
-            { text: 'Use Demo Outfit', onPress: () => {
-              setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
-              // Keep current weather info (don't override with mock data)
-            }},
-            { text: 'OK', style: 'cancel' }
-          ]
-        );
-      } else {
-        console.log('No outfit data available, using fallback');
-        setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
-        // Keep current weather info (don't override with mock data)
-      }
-    }
-  } catch (error) {
-    console.error('Outfit generation error:', error);
-    console.log('Using fallback outfit due to error');
-    
-    // Always show fallback instead of alert for now
-    setCurrentOutfit(mockOutfits[occasion] || mockOutfits.casual);
-    // Keep current weather info (don't override with mock data)
-    
-    // Optional: show alert only if you want to notify user
-    // Alert.alert(
-    //   'Connection Error', 
-    //   'Could not connect to AI service. Showing demo outfit.',
-    //   [{ text: 'OK' }]
-    // );
-  } finally {
-    setLoading(false);
-  }
-};
-
-// New function to generate multi-occasion recommendations
-const generateMultiOutfits = async () => {
-  setLoading(true);
-  
-  try {
-    let requestData;
-    
-    if (demoMode) {
-      requestData = {
-        user_id: 1,
-        demo_weather: {
+          occasion 
+        });
+        
+        requestData = {
+          user_id: 1,
+          demo_weather: {
+            temperature: parseInt(demoTemperature),
+            condition: demoCondition,
+            humidity: 60,
+            windSpeed: 10,
+            precipitation: 0,
+            location: 'Demo Location'
+          },
+          occasion: occasion
+        };
+        
+        setWeatherInfo({
           temperature: parseInt(demoTemperature),
           condition: demoCondition,
           humidity: 60,
           windSpeed: 10,
           precipitation: 0,
-          location: 'Demo Location'
-        },
-        occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
-      };
-    } else {
-      requestData = {
-        user_id: 1,
-        location: location ? {
-          latitude: location.latitude,
-          longitude: location.longitude
-        } : {
-          latitude: 40.7128,
-          longitude: -74.0060
-        },
-        occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
-      };
-    }
-    
-    console.log('Generating multi-occasion outfits:', requestData);
-    
-    const data = await apiService.post('/api/outfit/enhanced-recommendations', requestData);
-    
-    console.log('Multi-outfit API Response:', data);
-    
-    if (data.status === 'success' && data.recommendations) {
-      console.log('Setting multi outfits from API:', data.recommendations);
-      setMultiOutfits(data);
-      setShowMultiView(true);
+          location: 'Demo Mode',
+          icon: getWeatherIcon(demoCondition)
+        });
+        
+      } else {
+        const locationData = location || {
+          latitude: 37.7749,
+          longitude: -122.4194,
+        };
+        
+        console.log('Real weather mode: Using GPS location', { locationData, occasion });
+        
+        requestData = {
+          user_id: 1,
+          location: {
+            latitude: locationData.latitude,
+            longitude: locationData.longitude
+          },
+          occasion: occasion
+        };
+      }
       
-      // Set weather info
-      if (data.weather) {
+      const data = await apiService.post('/api/outfit/ai-recommendation', requestData);
+      
+      console.log('API Response:', data);
+      
+      if (data.status === 'success' && data.outfit && !data.outfit.error) {
+        console.log('Setting outfit from API:', data.outfit);
+        setCurrentOutfit(data.outfit);
+        
         const weatherData = {
           ...data.weather,
-          location: data.weather?.location || 'Current Location'
+          location: data.weather?.location?.name || data.weather?.location || 'Current Location'
         };
         setWeatherInfo(weatherData);
+      } else {
+        if (data.outfit?.error) {
+          console.log('API returned error:', data.outfit);
+          Alert.alert(
+            'Wardrobe Empty', 
+            data.outfit.message || 'Please add some clothes to your wardrobe first!',
+            [
+              { text: 'Add Clothes', onPress: () => navigation.navigate('AddClothes') },
+              { text: 'OK', style: 'cancel' }
+            ]
+          );
+          // Don't set any outfit, just show the error
+          setCurrentOutfit(null);
+        } else {
+          console.log('No outfit data available');
+          setCurrentOutfit(null);
+          Alert.alert('No Outfit Available', 'Unable to generate outfit recommendation. Please try again.');
+        }
       }
+    } catch (error) {
+      console.error('Outfit generation error:', error);
+      setCurrentOutfit(null);
+      
+      Alert.alert(
+        'Connection Error', 
+        'Could not connect to AI service. Please check your connection and try again.',
+        [
+          { text: 'Retry', onPress: () => generateOutfit() },
+          { text: 'OK' }
+        ]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateMultiOutfits = async () => {
+    setLoading(true);
+    
+    try {
+      let requestData;
+      
+      if (demoMode) {
+        requestData = {
+          user_id: 1,
+          demo_weather: {
+            temperature: parseInt(demoTemperature),
+            condition: demoCondition,
+            humidity: 60,
+            windSpeed: 10,
+            precipitation: 0,
+            location: 'Demo Location'
+          },
+          occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
+        };
+      } else {
+        requestData = {
+          user_id: 1,
+          location: location ? {
+            latitude: location.latitude,
+            longitude: location.longitude
+          } : {
+            latitude: 40.7128,
+            longitude: -74.0060
+          },
+          occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
+        };
+      }
+      
+      console.log('Generating multi-occasion outfits:', requestData);
+      
+      const data = await apiService.post('/api/outfit/multiple-recommendations', requestData);
+      
+      console.log('Multi-outfit API Response:', data);
+      
+      if (data.status === 'success' && data.recommendations) {
+        console.log('Setting multi outfits from API:', data.recommendations);
+        setMultiOutfits(data);
+        setShowMultiView(true);
+        
+        if (data.weather) {
+          const weatherData = {
+            ...data.weather,
+            location: data.weather?.location || 'Current Location'
+          };
+          setWeatherInfo(weatherData);
+        }
+      } else {
+        Alert.alert('Error', 'Unable to generate multi-occasion outfits. Please try again.');
+      }
+    } catch (error) {
+      console.error('Multi-outfit generation error:', error);
+      Alert.alert(
+        'Connection Error',
+        'Could not generate multi-occasion outfits. Please check your connection and try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getWeatherIcon = (condition) => {
+    if (!condition) return 'help-circle-outline';
+    
+    const conditionLower = String(condition).toLowerCase();
+    if (conditionLower.includes('sun') || conditionLower.includes('clear')) {
+      return 'sunny';
+    } else if (conditionLower.includes('cloud') || conditionLower.includes('overcast')) {
+      return 'cloudy';
+    } else if (conditionLower.includes('rain') || conditionLower.includes('shower') || conditionLower.includes('drizzle')) {
+      return 'rainy';
+    } else if (conditionLower.includes('snow')) {
+      return 'snow';
+    } else if (conditionLower.includes('thunder') || conditionLower.includes('storm')) {
+      return 'thunderstorm';
+    } else if (conditionLower.includes('fog') || conditionLower.includes('mist')) {
+      return 'cloud';
+    } else if (conditionLower.includes('loading')) {
+      return 'hourglass-outline';
     } else {
-      // Fallback to mock data
-      console.log('Using fallback multi outfits');
-      const fallbackMultiOutfits = {
-        status: 'success',
-        recommendations: {
-          casual: mockOutfits.casual,
-          work: mockOutfits.work,
-          formal: { ...mockOutfits.work, confidence: 85, reason: 'Perfect for formal events' },
-          workout: { ...mockOutfits.casual, confidence: 90, reason: 'Great for gym and exercise' },
-          datenight: { ...mockOutfits.work, confidence: 88, reason: 'Stylish choice for romantic dinner' }
-        },
-        wardrobe_analysis: {
-          total_items: 15,
-          occasion_readiness: {
-            casual: { confidence: 92, status: 'excellent' },
-            work: { confidence: 88, status: 'good' },
-            formal: { confidence: 85, status: 'good' },
-            workout: { confidence: 90, status: 'excellent' },
-            datenight: { confidence: 88, status: 'good' }
+      return 'partly-sunny';
+    }
+  };
+
+  const getCityNameFromCoordinates = (lat, lon) => {
+    const cities = [
+      { name: 'Galle', lat: 6.0535, lon: 80.2210, radius: 0.1 },
+      { name: 'Colombo', lat: 6.9271, lon: 79.8612, radius: 0.15 },
+      { name: 'Kandy', lat: 7.2966, lon: 80.6350, radius: 0.1 },
+      { name: 'Jaffna', lat: 9.6615, lon: 80.0255, radius: 0.1 },
+      { name: 'Negombo', lat: 7.2084, lon: 79.8380, radius: 0.08 },
+      { name: 'Matara', lat: 5.9549, lon: 80.5550, radius: 0.08 },
+      { name: 'Batticaloa', lat: 7.7102, lon: 81.6924, radius: 0.1 },
+      { name: 'Trincomalee', lat: 8.5874, lon: 81.2152, radius: 0.1 },
+      { name: 'Anuradhapura', lat: 8.3114, lon: 80.4037, radius: 0.1 },
+      { name: 'Polonnaruwa', lat: 7.9403, lon: 81.0188, radius: 0.1 },
+      { name: 'Ratnapura', lat: 6.6828, lon: 80.4034, radius: 0.1 },
+      { name: 'Badulla', lat: 6.9934, lon: 81.0550, radius: 0.1 },
+      { name: 'Kurunegala', lat: 7.4818, lon: 80.3609, radius: 0.1 },
+    ];
+
+    for (const city of cities) {
+      const distance = Math.sqrt(
+        Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2)
+      );
+      if (distance <= city.radius) {
+        return city.name;
+      }
+    }
+
+    return null;
+  };
+
+  const getAccurateCityName = async (latitude, longitude) => {
+    try {
+      console.log('Getting accurate city name for coordinates:', latitude, longitude);
+      
+      try {
+        const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`;
+        
+        const response = await fetch(nominatimUrl, {
+          headers: {
+            'User-Agent': 'StyraApp/1.0',
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Nominatim reverse geocoding result:', data);
+          
+          if (data.address) {
+            const cityName = data.address.city || 
+                            data.address.town || 
+                            data.address.village || 
+                            data.address.suburb ||
+                            data.address.municipality ||
+                            data.address.county ||
+                            data.address.state_district;
+            
+            if (cityName) {
+              console.log('Found city via Nominatim:', cityName);
+              return cityName;
+            }
           }
         }
-      };
-      setMultiOutfits(fallbackMultiOutfits);
-      setShowMultiView(true);
-    }
-  } catch (error) {
-    console.error('Multi-outfit generation error:', error);
-    
-    // Show fallback multi outfits
-    const fallbackMultiOutfits = {
-      status: 'success',
-      recommendations: {
-        casual: mockOutfits.casual,
-        work: mockOutfits.work,
-        formal: { ...mockOutfits.work, confidence: 85, reason: 'Perfect for formal events' },
-        workout: { ...mockOutfits.casual, confidence: 90, reason: 'Great for gym and exercise' },
-        datenight: { ...mockOutfits.work, confidence: 88, reason: 'Stylish choice for romantic dinner' }
-      },
-      wardrobe_analysis: {
-        total_items: 15,
-        occasion_readiness: {
-          casual: { confidence: 92, status: 'excellent' },
-          work: { confidence: 88, status: 'good' },
-          formal: { confidence: 85, status: 'good' },
-          workout: { confidence: 90, status: 'excellent' },
-          datenight: { confidence: 88, status: 'good' }
-        }
+      } catch (error) {
+        console.log('Nominatim API failed:', error.message);
       }
-    };
-    setMultiOutfits(fallbackMultiOutfits);
-    setShowMultiView(true);
-  } finally {
-    setLoading(false);
-  }
-};
-
-const getWeatherIcon = (condition) => {
-  if (!condition) return 'help-circle-outline';
-  
-  const conditionLower = String(condition).toLowerCase();
-  if (conditionLower.includes('sun') || conditionLower.includes('clear')) {
-    return 'sunny';
-  } else if (conditionLower.includes('cloud') || conditionLower.includes('overcast')) {
-    return 'cloudy';
-  } else if (conditionLower.includes('rain') || conditionLower.includes('shower') || conditionLower.includes('drizzle')) {
-    return 'rainy';
-  } else if (conditionLower.includes('snow')) {
-    return 'snow';
-  } else if (conditionLower.includes('thunder') || conditionLower.includes('storm')) {
-    return 'thunderstorm';
-  } else if (conditionLower.includes('fog') || conditionLower.includes('mist')) {
-    return 'cloud';
-  } else if (conditionLower.includes('loading')) {
-    return 'hourglass-outline';
-  } else {
-    return 'partly-sunny';
-  }
-};
-
-const getCityNameFromCoordinates = (lat, lon) => {
-  // Define Sri Lankan cities with their approximate coordinates
-  const cities = [
-    { name: 'Galle', lat: 6.0535, lon: 80.2210, radius: 0.1 },
-    { name: 'Colombo', lat: 6.9271, lon: 79.8612, radius: 0.15 },
-    { name: 'Kandy', lat: 7.2966, lon: 80.6350, radius: 0.1 },
-    { name: 'Jaffna', lat: 9.6615, lon: 80.0255, radius: 0.1 },
-    { name: 'Negombo', lat: 7.2084, lon: 79.8380, radius: 0.08 },
-    { name: 'Matara', lat: 5.9549, lon: 80.5550, radius: 0.08 },
-    { name: 'Batticaloa', lat: 7.7102, lon: 81.6924, radius: 0.1 },
-    { name: 'Trincomalee', lat: 8.5874, lon: 81.2152, radius: 0.1 },
-    { name: 'Anuradhapura', lat: 8.3114, lon: 80.4037, radius: 0.1 },
-    { name: 'Polonnaruwa', lat: 7.9403, lon: 81.0188, radius: 0.1 },
-    { name: 'Ratnapura', lat: 6.6828, lon: 80.4034, radius: 0.1 },
-    { name: 'Badulla', lat: 6.9934, lon: 81.0550, radius: 0.1 },
-    { name: 'Kurunegala', lat: 7.4818, lon: 80.3609, radius: 0.1 },
-  ];
-
-  // Find the closest city within radius
-  for (const city of cities) {
-    const distance = Math.sqrt(
-      Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2)
-    );
-    if (distance <= city.radius) {
-      return city.name;
-    }
-  }
-
-  // If no exact match found, return null to use API location
-  return null;
-};
-
-const getAccurateCityName = async (latitude, longitude) => {
-  try {
-    console.log('Getting accurate city name for coordinates:', latitude, longitude);
-    
-    // Try OpenStreetMap Nominatim API (free reverse geocoding)
-    try {
-      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`;
       
-      const response = await fetch(nominatimUrl, {
-        headers: {
-          'User-Agent': 'StyraApp/1.0', // Required by Nominatim
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Nominatim reverse geocoding result:', data);
-        
-        if (data.address) {
-          // Try to get the most appropriate city/town name
-          const cityName = data.address.city || 
-                          data.address.town || 
-                          data.address.village || 
-                          data.address.suburb ||
-                          data.address.municipality ||
-                          data.address.county ||
-                          data.address.state_district;
+      try {
+        const reverseGeocode = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude,
+        });
+
+        if (reverseGeocode && reverseGeocode.length > 0) {
+          const location = reverseGeocode[0];
+          console.log('Expo reverse geocoding result:', location);
+          
+          const cityName = location.city || 
+                          location.subregion || 
+                          location.district || 
+                          location.region || 
+                          location.name;
           
           if (cityName) {
-            console.log('Found city via Nominatim:', cityName);
+            console.log('Found city via Expo reverse geocoding:', cityName);
             return cityName;
           }
         }
+      } catch (error) {
+        console.log('Expo reverse geocoding failed:', error.message);
       }
+      
+      return getCityNameFromCoordinates(latitude, longitude);
+      
     } catch (error) {
-      console.log('Nominatim API failed:', error.message);
+      console.error('All reverse geocoding methods failed:', error);
+      return getCityNameFromCoordinates(latitude, longitude);
     }
+  };
+
+  const regenerateItem = async (itemCategory) => {
+    if (!currentOutfit) return;
     
-    // Fallback to Expo Location reverse geocoding
     try {
-      const reverseGeocode = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
-
-      if (reverseGeocode && reverseGeocode.length > 0) {
-        const location = reverseGeocode[0];
-        console.log('Expo reverse geocoding result:', location);
-        
-        const cityName = location.city || 
-                        location.subregion || 
-                        location.district || 
-                        location.region || 
-                        location.name;
-        
-        if (cityName) {
-          console.log('Found city via Expo reverse geocoding:', cityName);
-          return cityName;
+      setRegeneratingItem(itemCategory);
+      
+      const currentItem = currentOutfit.items ? 
+        currentOutfit.items.find(item => 
+          item.category && item.category.toLowerCase() === itemCategory.toLowerCase()
+        ) : null;
+      
+      const requestData = {
+        current_outfit: currentOutfit,
+        item_category: itemCategory,
+        current_item_id: currentItem ? currentItem.id : null,
+        occasion: occasion,
+        user_id: 1,
+        user_preferences: {
+          occasion: occasion,
+          weather: weatherInfo?.condition || 'mild',
+          style: 'casual'
         }
+      };
+      
+      console.log('Regenerating item:', itemCategory, 'Current item ID:', currentItem?.id, requestData);
+      
+      const response = await apiService.post('/api/outfit/regenerate-item', requestData);
+      
+      if (response && response.status === 'success') {
+        setCurrentOutfit(response.outfit);
+        
+        const newItemName = response.replaced_item?.new_item || 'new item';
+        const alternativesCount = response.replaced_item?.alternatives_available || 0;
+        
+        Alert.alert(
+          'Item Updated!', 
+          `New ${itemCategory}: ${newItemName}${alternativesCount > 0 ? ` (${alternativesCount} more alternatives available)` : ''}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', response.message || 'Failed to regenerate item');
       }
     } catch (error) {
-      console.log('Expo reverse geocoding failed:', error.message);
+      console.error('Error regenerating item:', error);
+      Alert.alert('Error', 'Failed to regenerate item. Please try again.');
+    } finally {
+      setRegeneratingItem(null);
     }
-    
-    // Final fallback to coordinate-based detection
-    return getCityNameFromCoordinates(latitude, longitude);
-    
-  } catch (error) {
-    console.error('All reverse geocoding methods failed:', error);
-    return getCityNameFromCoordinates(latitude, longitude);
-  }
-};
+  };
 
-const regenerateItem = async (itemCategory) => {
-  if (!currentOutfit) return;
-  
-  try {
-    setRegeneratingItem(itemCategory);
+  const handleLikeOutfit = async () => {
+    if (!currentOutfit) return;
     
-    // Find the current item in this category to exclude it
-    const currentItem = currentOutfit.items ? 
-      currentOutfit.items.find(item => 
-        item.category && item.category.toLowerCase() === itemCategory.toLowerCase()
-      ) : null;
-    
-    const requestData = {
-      current_outfit: currentOutfit,
-      item_category: itemCategory,
-      current_item_id: currentItem ? currentItem.id : null, // Add current item ID
-      occasion: occasion,
-      user_id: 1,
-      user_preferences: {
-        occasion: occasion,
-        weather: weatherInfo?.condition || 'mild',
-        style: 'casual'
-      }
-    };
-    
-    console.log('Regenerating item:', itemCategory, 'Current item ID:', currentItem?.id, requestData);
-    
-    const response = await apiService.post('/api/outfit/regenerate-item', requestData);
-    
-    if (response && response.status === 'success') {
-      setCurrentOutfit(response.outfit);
+    try {
+      await apiService.post('/api/outfit/feedback', {
+        user_id: 1,
+        outfit_id: currentOutfit.id,
+        feedback_type: 'like',
+        weather_data: weatherInfo,
+        occasion: occasion
+      });
       
-      // Show more detailed success message
-      const newItemName = response.replaced_item?.new_item || 'new item';
-      const alternativesCount = response.replaced_item?.alternatives_available || 0;
-      
-      Alert.alert(
-        'Item Updated!', 
-        `New ${itemCategory}: ${newItemName}${alternativesCount > 0 ? ` (${alternativesCount} more alternatives available)` : ''}`,
-        [{ text: 'OK' }]
-      );
-    } else {
-      Alert.alert('Error', response.message || 'Failed to regenerate item');
+      Alert.alert('Outfit Liked!', 'Thanks for the feedback! Our AI will learn from your preferences.');
+    } catch (error) {
+      console.error('Feedback error:', error);
     }
-  } catch (error) {
-    console.error('Error regenerating item:', error);
-    Alert.alert('Error', 'Failed to regenerate item. Please try again.');
-  } finally {
-    setRegeneratingItem(null);
-  }
-};
+  };
 
-const handleLikeOutfit = async () => {
-  if (!currentOutfit) return;
-  
-  try {
-    await apiService.post('/api/outfit/feedback', {
-      user_id: 1,
-      outfit_id: currentOutfit.id,
-      feedback_type: 'like',
-      weather_data: weatherInfo,
-      occasion: occasion
-    });
-    
-    Alert.alert('Outfit Liked!', 'Thanks for the feedback! Our AI will learn from your preferences.');
-  } catch (error) {
-    console.error('Feedback error:', error);
-  }
-};
   const handleDislikeOutfit = () => {
-    generateOutfit(); // Generate a new outfit
+    generateOutfit();
   };
 
   const handleWearOutfit = async () => {
@@ -642,7 +562,6 @@ const handleLikeOutfit = async () => {
     try {
       setLoading(true);
       
-      // Get current location for context (optional)
       let location = null;
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -662,20 +581,18 @@ const handleLikeOutfit = async () => {
         console.log('Could not get location:', locationError);
       }
 
-      // Format outfit data for storage
       const outfitData = outfitHistoryService.formatOutfitForStorage(
         currentOutfit.items,
         occasion,
         currentOutfit.confidence
       );
 
-      // Record the worn outfit using the outfit history service
       const result = await outfitHistoryService.recordWornOutfit(
         outfitData,
         occasion,
         weatherInfo?.condition || defaultWeatherData.condition,
         location,
-        new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+        new Date().toISOString().split('T')[0]
       );
 
       if (result && result.status === 'success') {
@@ -736,7 +653,7 @@ const handleLikeOutfit = async () => {
               };
 
               const result = await favoriteOutfitService.saveFavorite(
-                1, // user_id
+                1,
                 outfitData,
                 outfitName.trim()
               );
@@ -960,8 +877,7 @@ const handleLikeOutfit = async () => {
                   )}
                   <Text style={styles.retryItemText}>
                     {regeneratingItem === item.category ? 'Finding...' : `Try Another`}
-                  </Text>
-                </TouchableOpacity>
+                  </Text></TouchableOpacity>
               </View>
             ))}
           </View>
@@ -975,6 +891,141 @@ const handleLikeOutfit = async () => {
     </View>
   );
 
+  const renderMultiOutfitView = () => {
+    if (!multiOutfits || !multiOutfits.recommendations) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyTitle}>No Multi-Outfit Data</Text>
+          <Text style={styles.emptyText}>Unable to generate multi-occasion outfits</Text>
+        </View>
+      );
+    }
+
+    const getOccasionColor = (occasionId) => {
+      const colors = {
+        casual: '#4CAF50',
+        work: '#2196F3', 
+        formal: '#9C27B0',
+        workout: '#FF5722',
+        datenight: '#E91E63'
+      };
+      return colors[occasionId] || '#666';
+    };
+
+    const getStatusColor = (status) => {
+      const colors = {
+        excellent: '#4CAF50',
+        good: '#8BC34A',
+        fair: '#FFC107',
+        poor: '#F44336'
+      };
+      return colors[status] || '#666';
+    };
+
+    return (
+      <View style={styles.multiOutfitContainer}>
+        <Text style={styles.multiOutfitTitle}>All Occasion Outfits</Text>
+        
+        {multiOutfits.wardrobe_analysis && (
+          <View style={styles.analysisCard}>
+            <Text style={styles.analysisTitle}>
+              Wardrobe Analysis: {multiOutfits.wardrobe_analysis.total_items} items
+            </Text>
+            <Text style={styles.analysisText}>
+              Ready for all occasions with personalized AI recommendations
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.occasionGrid}>
+          {Object.entries(multiOutfits.recommendations).map(([occasionId, outfit]) => {
+            const occasionInfo = occasions.find(occ => occ.id === occasionId) || 
+                               { id: occasionId, name: occasionId, icon: 'shirt' };
+            const readiness = multiOutfits.wardrobe_analysis?.occasion_readiness?.[occasionId];
+
+            return (
+              <TouchableOpacity
+                key={occasionId}
+                style={[
+                  styles.occasionCard,
+                  { borderColor: getOccasionColor(occasionId) }
+                ]}
+                onPress={() => {
+                  setCurrentOutfit(outfit);
+                  setOccasion(occasionId);
+                  setShowMultiView(false);
+                }}
+              >
+                <View style={[
+                  styles.occasionHeader,
+                  { backgroundColor: getOccasionColor(occasionId) }
+                ]}>
+                  <Ionicons name={occasionInfo.icon} size={16} color="#fff" />
+                  <Text style={styles.occasionName}>{occasionInfo.name}</Text>
+                </View>
+
+                <View style={styles.occasionContent}>
+                  {outfit.error ? (
+                    <View style={styles.errorContent}>
+                      <Ionicons name="alert-circle" size={24} color="#E74C3C" />
+                      <Text style={styles.errorText}>{outfit.message}</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={styles.confidenceRow}>
+                        <Text style={styles.confidenceLabel}>
+                          {outfit.confidence || 0}% match
+                        </Text>
+                        {readiness && (
+                          <View style={[
+                            styles.statusBadge,
+                            { backgroundColor: getStatusColor(readiness.status) }
+                          ]}>
+                            <Text style={styles.statusText}>{readiness.status}</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {outfit.items && outfit.items.length > 0 && (
+                        <View style={styles.outfitPreview}>
+                          {outfit.items.slice(0, 3).map((item, index) => (
+                            <View key={index} style={styles.previewItem}>
+                              <Image
+                                source={{
+                                  uri: item.image_path ? 
+                                    `http://172.20.10.7:8000${item.image_path}` : 
+                                    'https://via.placeholder.com/60'
+                                }}
+                                style={styles.previewImage}
+                              />
+                              <Text style={styles.previewItemText} numberOfLines={1}>
+                                {item.name}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      <Text style={styles.outfitReason} numberOfLines={2}>
+                        {outfit.reason || 'Perfect outfit for this occasion'}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={styles.backToSingleButton}
+          onPress={() => setShowMultiView(false)}
+        >
+          <Text style={styles.backToSingleButtonText}>Back to Single Outfit</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -984,7 +1035,25 @@ const handleLikeOutfit = async () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Get Outfit</Text>
         <View style={styles.headerActions}>
-
+          <TouchableOpacity 
+            style={[
+              styles.viewToggle,
+              showMultiView && styles.activeViewToggle
+            ]}
+            onPress={() => {
+              if (showMultiView) {
+                setShowMultiView(false);
+              } else {
+                generateMultiOutfits();
+              }
+            }}
+          >
+            <Ionicons 
+              name={showMultiView ? "person" : "people"} 
+              size={20} 
+              color={showMultiView ? "#fff" : "#8A724C"} 
+            />
+          </TouchableOpacity>
           <TouchableOpacity onPress={showMultiView ? generateMultiOutfits : generateOutfit}>
             <Ionicons name="refresh" size={24} color="#DCC9A7" />
           </TouchableOpacity>
@@ -1000,7 +1069,7 @@ const handleLikeOutfit = async () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF8C42" />
+            <ActivityIndicator size="large" color="#8A724C" />
             <Text style={styles.loadingText}>
               {showMultiView ? 'Generating outfits for all occasions...' : 'Generating your perfect outfit...'}
             </Text>
@@ -1012,8 +1081,8 @@ const handleLikeOutfit = async () => {
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons name="shirt-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyTitle}>No Outfit Generated</Text>
-            <Text style={styles.emptyText}>Tap the refresh button to get outfit suggestions</Text>
+            <Text style={styles.emptyTitle}>No Outfit Available</Text>
+            <Text style={styles.emptyText}>Add clothes to your wardrobe or tap the refresh button to get outfit suggestions</Text>
             <TouchableOpacity style={styles.generateButton} onPress={generateOutfit}>
               <Text style={styles.generateButtonText}>Generate Outfit</Text>
             </TouchableOpacity>
@@ -1021,45 +1090,45 @@ const handleLikeOutfit = async () => {
         )}
       </ScrollView>
 
-      {!loading && currentOutfit && (
-  <View style={styles.actionButtons}>
-    <View style={styles.buttonRow}>
-      <TouchableOpacity 
-        style={styles.dislikeButton} 
-        onPress={handleDislikeOutfit}
-      >
-        <Ionicons name="thumbs-down" size={20} color="#fff" />
-        <Text style={styles.buttonText}>Try Again</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.favoriteButton} 
-        onPress={handleSaveFavorite}
-      >
-        <Ionicons name="heart-outline" size={20} color="#fff" />
-        <Text style={styles.buttonText}>Favorite</Text>
-      </TouchableOpacity>
-    </View>
-    
-    <View style={styles.buttonRow}>
-      <TouchableOpacity 
-        style={styles.likeButton} 
-        onPress={handleLikeOutfit}
-      >
-        <Ionicons name="heart" size={20} color="#fff" />
-        <Text style={styles.buttonText}>Save</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.wearButton} 
-        onPress={handleWearOutfit}
-      >
-        <Ionicons name="checkmark" size={20} color="#fff" />
-        <Text style={styles.buttonText}>Wear This</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-)}
+      {!loading && currentOutfit && !showMultiView && (
+        <View style={styles.actionButtons}>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.dislikeButton} 
+              onPress={handleDislikeOutfit}
+            >
+              <Ionicons name="thumbs-down" size={20} color="#fff" />
+              <Text style={styles.buttonText}>Try Again</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.favoriteButton} 
+              onPress={handleSaveFavorite}
+            >
+              <Ionicons name="heart-outline" size={20} color="#fff" />
+              <Text style={styles.buttonText}>Favorite</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.likeButton} 
+              onPress={handleLikeOutfit}
+            >
+              <Ionicons name="heart" size={20} color="#fff" />
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.wearButton} 
+              onPress={handleWearOutfit}
+            >
+              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Text style={styles.buttonText}>Wear This</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -1082,6 +1151,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewToggle: {
+    padding: 8,
+    marginRight: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#8A724C',
+  },
+  activeViewToggle: {
+    backgroundColor: '#8A724C',
   },
   content: {
     flex: 1,
@@ -1260,55 +1343,55 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionButtons: {
-  paddingHorizontal: 20,
-  paddingVertical: 15,
-  borderTopWidth: 1,
-  borderTopColor: '#f0f0f0',
-},
-buttonRow: {
-  flexDirection: 'row',
-  marginBottom: 10,
-},
-dislikeButton: {
-  flex: 1,
-  backgroundColor: '#B99668',
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingVertical: 12,
-  borderRadius: 8,
-  marginRight: 5,
-},
-favoriteButton: {
-  flex: 1,
-  backgroundColor: '#B99668',
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingVertical: 12,
-  borderRadius: 8,
-  marginLeft: 5,
-},
-likeButton: {
-  flex: 1,
-  backgroundColor: '#B99668',
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingVertical: 12,
-  borderRadius: 8,
-  marginRight: 5,
-},
-wearButton: {
-  flex: 1,
-  backgroundColor: '#B99668',
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingVertical: 12,
-  borderRadius: 8,
-  marginLeft: 5,
-},
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  dislikeButton: {
+    flex: 1,
+    backgroundColor: '#B99668',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginRight: 5,
+  },
+  favoriteButton: {
+    flex: 1,
+    backgroundColor: '#B99668',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginLeft: 5,
+  },
+  likeButton: {
+    flex: 1,
+    backgroundColor: '#B99668',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginRight: 5,
+  },
+  wearButton: {
+    flex: 1,
+    backgroundColor: '#B99668',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginLeft: 5,
+  },
   buttonText: {
     color: '#fff',
     fontSize: 14,
@@ -1458,21 +1541,6 @@ wearButton: {
     fontSize: 16,
     fontWeight: '600',
   },
-  // Header actions styles
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewToggle: {
-    padding: 8,
-    marginRight: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#FF8C42',
-  },
-  activeViewToggle: {
-    backgroundColor: '#FF8C42',
-  },
   // Multi-outfit view styles
   multiOutfitContainer: {
     padding: 15,
@@ -1591,6 +1659,19 @@ wearButton: {
     textAlign: 'center',
     marginTop: 5,
   },
+  backToSingleButton: {
+    backgroundColor: '#8A724C',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 15,
+    marginHorizontal: 20,
+  },
+  backToSingleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
-
 export default GetOutfitScreen;
