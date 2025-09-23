@@ -45,10 +45,20 @@ async recordWornOutfit(outfitData, occasion = null, weather = null, location = n
     console.log('Getting outfit history with params:', params.toString());
 
     const response = await apiService.get(`/api/outfit/history?${params.toString()}`);
-    
-    if (response.status === 'success') {
-      console.log('Outfit history retrieved:', response);
-      return response;
+    console.log('Raw outfit history response:', response);
+
+    // Normalize backend response shapes. Some endpoints return { status: 'success', history: [...] }
+    // others might return just { history: [...] } or similar.
+    if (response && (response.status === 'success' || response.history)) {
+      // If status present and success, return as-is; otherwise wrap history into expected shape
+      if (response.status === 'success') {
+        console.log('Outfit history retrieved:', response);
+        return response;
+      }
+
+      // No explicit status but history exists
+      console.log('Outfit history retrieved (no status):', response.history);
+      return { status: 'success', history: response.history };
     } else {
       throw new Error(response.message || 'Failed to get outfit history');
     }
@@ -57,6 +67,8 @@ async recordWornOutfit(outfitData, occasion = null, weather = null, location = n
     throw error;
   }
 }
+
+
   async getOutfitByDate(wornDate) {
   try {
     console.log('Getting outfit for date:', wornDate);

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import outfitHistoryService from '../services/outfitHistoryService';
+import API_CONFIG from '../config/api';
 
 const WornOutfitsScreen = ({ navigation }) => {
   const [wornOutfits, setWornOutfits] = useState([]);
@@ -44,9 +45,24 @@ const WornOutfitsScreen = ({ navigation }) => {
       console.log('Loading worn outfits history...');
       
       const response = await outfitHistoryService.getOutfitHistory(50);
-      
+      console.log('Raw outfit history service response:', response);
+
       if (response && response.status === 'success') {
         console.log('Worn outfits loaded successfully:', response.history?.length);
+        
+        // Enhanced logging for debugging
+        response.history?.forEach((outfit, index) => {
+          console.log(`Outfit ${index}:`, {
+            id: outfit.id,
+            worn_date: outfit.worn_date,
+            image_url: outfit.image_url,
+            image_path: outfit.image_path,
+            outfit_data_structure: outfit.outfit_data ? Object.keys(outfit.outfit_data) : 'null',
+            items_count: outfit.outfit_data?.items?.length || 0,
+            first_item: outfit.outfit_data?.items?.[0] || 'no items'
+          });
+        });
+        
         setWornOutfits(response.history || []);
       } else {
         throw new Error(response?.message || 'Failed to load outfit history');
@@ -78,10 +94,59 @@ const WornOutfitsScreen = ({ navigation }) => {
     });
   };
 
+  const getImageUri = (clothingItem, fallbackItem = null) => {
+    const base = API_CONFIG.primary || 'http://localhost:8000';
+    
+    // Try multiple sources in order of preference
+    const imageSources = [
+      clothingItem?.image_url,
+      clothingItem?.image_path, 
+      clothingItem?.imageUrl,
+      clothingItem?.imageUri,
+      clothingItem?.image,
+      clothingItem?.path,
+      clothingItem?.uri,
+      clothingItem?.src,
+      clothingItem?.photo,
+      clothingItem?.picture,
+      fallbackItem?.image_url,
+      fallbackItem?.image_path
+    ];
+    
+    console.log('Image sources for item:', imageSources.filter(Boolean));
+    
+    for (const source of imageSources) {
+      if (source && typeof source === 'string' && source.trim()) {
+        console.log('Processing image source:', source);
+        
+        if (source.match(/^https?:\/\//i)) {
+          console.log('Using absolute URL:', source);
+          return source;
+        } else if (source.startsWith('/')) {
+          const fullUrl = `${base}${source}`;
+          console.log('Using relative URL:', fullUrl);
+          return fullUrl;
+        } else {
+          const fullUrl = `${base}/${source}`.replace(/([^:\/])\/\//g, '$1/');
+          console.log('Using constructed URL:', fullUrl);
+          return fullUrl;
+        }
+      }
+    }
+    
+    const placeholder = 'https://via.placeholder.com/100?text=No+Image';
+    console.log('Using placeholder:', placeholder);
+    return placeholder;
+  };
+
   const renderWornOutfitItem = ({ item }) => {
-    console.log('Rendering outfit item:', JSON.stringify(item, null, 2));
-    console.log('Outfit data items:', item.outfit_data?.items);
-    console.log('Outfit data structure:', typeof item.outfit_data, item.outfit_data);
+    console.log('Rendering outfit item:', {
+      id: item.id,
+      worn_date: item.worn_date,
+      image_url: item.image_url,
+      image_path: item.image_path,
+      items_count: item.outfit_data?.items?.length || 0
+    });
     
     return (
       <View style={styles.outfitCard}>
@@ -92,29 +157,44 @@ const WornOutfitsScreen = ({ navigation }) => {
         
         <View style={styles.outfitItemsContainer}>
           {item.outfit_data && item.outfit_data.items && item.outfit_data.items.length > 0 ? (
-            item.outfit_data.items.map((clothingItem, index) => (
-              <View key={index} style={styles.clothingItem}>
-                <View style={styles.circularImageContainer}>
-                  <Image 
-                    source={{ 
-                      uri: (() => {
-                        const imageUrl = clothingItem.image_path || clothingItem.image_url;
-                        if (!imageUrl) return 'https://via.placeholder.com/100';
-                        if (imageUrl.startsWith('http')) return imageUrl;
-                        return `http://172.20.10.7:8000${imageUrl}`;
-                      })()
-                    }} 
-                    style={styles.circularImage} 
-                    onError={() => console.log('Image failed to load:', clothingItem.image_path || clothingItem.image_url)}
-                  />
+            item.outfit_data.items.map((clothingItem, index) => {
+              const resolvedUri = getImageUri(clothingItem, item);
+              
+              console.log(`Item ${index} resolved URI:`, resolvedUri);
+              console.log(`Item ${index} data:`, clothingItem);
+
+              return (
+                <View key={index} style={styles.clothingItem}>
+                  <View style={styles.circularImageContainer}>
+                    <Image
+                      source={{ uri: resolvedUri }}
+                      style={styles.circularImage}
+                      onError={(e) => {
+                        console.log('Image failed to load:', resolvedUri);
+                        console.log('Error details:', e.nativeEvent);
+                      }}
+                      onLoad={() => {
+                        console.log('Image loaded successfully:', resolvedUri);
+                      }}
+                      onLoadStart={() => {
+                        console.log('Image load started:', resolvedUri);
+                      }}
+                    />
+                  </View>
+                  <Text style={styles.clothingName} numberOfLines={2}>
+                    {clothingItem.name || clothingItem.item || clothingItem.title || 'Unknown Item'}
+                  </Text>
                 </View>
-                <Text style={styles.clothingName} numberOfLines={2}>
-                  {clothingItem.name || clothingItem.item || 'Unknown Item'}
-                </Text>
-              </View>
-            ))
+              );
+            })
           ) : (
-            <Text style={styles.noItemsText}>No items found for this outfit</Text>
+            <View style={styles.noItemsContainer}>
+              <Text style={styles.noItemsText}>No items found for this outfit</Text>
+              <Text style={styles.debugText}>
+                Debug: outfit_data = {item.outfit_data ? 'exists' : 'null'}, 
+                items = {item.outfit_data?.items ? `array[${item.outfit_data.items.length}]` : 'null'}
+              </Text>
+            </View>
           )}
         </View>
         
@@ -143,6 +223,14 @@ const WornOutfitsScreen = ({ navigation }) => {
             </Text>
           </View>
         )}
+        
+        {/* Debug information - remove in production */}
+        <View style={styles.debugContainer}>
+          <Text style={styles.debugText}>
+            Debug: ID={item.id}, Items={item.outfit_data?.items?.length || 0}, 
+            Image={item.image_path ? 'has path' : 'no path'}
+          </Text>
+        </View>
       </View>
     );
   };
@@ -314,12 +402,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
+  noItemsContainer: {
+    flex: 1,
+    paddingVertical: 20,
+  },
   noItemsText: {
     fontSize: 14,
     color: '#999',
     fontStyle: 'italic',
     textAlign: 'center',
-    paddingVertical: 20,
+  },
+  debugContainer: {
+    marginTop: 10,
+    padding: 8,
+    backgroundColor: '#e9ecef',
+    borderRadius: 4,
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#6c757d',
+    fontFamily: 'monospace',
   },
   weatherContainer: {
     flexDirection: 'row',

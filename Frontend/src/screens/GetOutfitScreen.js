@@ -13,12 +13,15 @@ import {
   TextInput,
   Switch,
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import apiService from '../services/apiService';
 import outfitHistoryService from '../services/outfitHistoryService';
 import favoriteOutfitService from '../services/favoriteOutfitService';
 import weatherService from '../services/weatherService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import API_CONFIG from '../config/api';
 
 const GetOutfitScreen = ({ navigation }) => {
   const [currentOutfit, setCurrentOutfit] = useState(null);
@@ -554,71 +557,103 @@ const GetOutfitScreen = ({ navigation }) => {
   };
 
   const handleWearOutfit = async () => {
-    if (!currentOutfit || !currentOutfit.items) {
-      Alert.alert('Error', 'No outfit to record');
-      return;
-    }
+  if (!currentOutfit || !currentOutfit.items) {
+    Alert.alert('Error', 'No outfit to record');
+    return;
+  }
 
+  try {
+    setLoading(true);
+    
+    let location = null;
     try {
-      setLoading(true);
-      
-      let location = null;
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const locationData = await Location.getCurrentPositionAsync({});
-          const reverseGeocode = await Location.reverseGeocodeAsync({
-            latitude: locationData.coords.latitude,
-            longitude: locationData.coords.longitude,
-          });
-          
-          if (reverseGeocode.length > 0) {
-            const address = reverseGeocode[0];
-            location = `${address.city || ''}, ${address.region || ''}`.trim().replace(/^,|,$/, '');
-          }
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const locationData = await Location.getCurrentPositionAsync({});
+        const reverseGeocode = await Location.reverseGeocodeAsync({
+          latitude: locationData.coords.latitude,
+          longitude: locationData.coords.longitude,
+        });
+        
+        if (reverseGeocode.length > 0) {
+          const address = reverseGeocode[0];
+          location = `${address.city || ''}, ${address.region || ''}`.trim().replace(/^,|,$/, '');
         }
-      } catch (locationError) {
-        console.log('Could not get location:', locationError);
       }
-
-      const outfitData = outfitHistoryService.formatOutfitForStorage(
-        currentOutfit.items,
-        occasion,
-        currentOutfit.confidence
-      );
-
-      const result = await outfitHistoryService.recordWornOutfit(
-        outfitData,
-        occasion,
-        weatherInfo?.condition || defaultWeatherData.condition,
-        location,
-        new Date().toISOString().split('T')[0]
-      );
-
-      if (result && result.status === 'success') {
-        Alert.alert(
-          'Outfit Recorded!',
-          `This outfit has been saved to your history for today.`,
-          [
-            { text: 'View History', onPress: () => navigation.navigate('WornOutfits') },
-            { text: 'Generate New Outfit', onPress: generateOutfit },
-            { text: 'OK', style: 'default' }
-          ]
-        );
-      } else {
-        throw new Error(result?.message || 'Failed to record outfit');
-      }
-    } catch (error) {
-      console.error('Error recording outfit:', error);
-      Alert.alert(
-        'Error',
-        'Failed to record outfit. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setLoading(false);
+    } catch (locationError) {
+      console.log('Could not get location:', locationError);
+      location = 'Unknown Location';
     }
-  };
+
+    // FIXED: Create proper outfit data structure for backend
+    const outfitForBackend = {
+      items: currentOutfit.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        color: item.color,
+        brand: item.brand,
+        season: item.season,
+        // CRITICAL: Ensure image fields are included
+        image_path: item.image_path,
+        image_url: item.image_url || item.image_path,
+        // Add any other fields that might contain images
+        imageUri: item.imageUri,
+        imageUrl: item.imageUrl,
+        image: item.image,
+        path: item.path,
+        uri: item.uri
+      })),
+      confidence: currentOutfit.confidence,
+      reason: currentOutfit.reason,
+      occasion: occasion
+    };
+
+    console.log('Sending outfit data to backend:', JSON.stringify(outfitForBackend, null, 2));
+
+    // Call the backend API directly instead of using outfitHistoryService
+    const response = await fetch(`${API_CONFIG.primary}/api/outfit/wear`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${await AsyncStorage.getItem('userToken')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        outfit_data: outfitForBackend,
+        occasion: occasion,
+        weather: weatherInfo?.condition || 'unknown',
+        location: location,
+        worn_date: new Date().toISOString().split('T')[0]
+      })
+    });
+
+    const result = await response.json();
+    console.log('Backend response:', result);
+
+    if (result && result.status === 'success') {
+      Alert.alert(
+        'Outfit Recorded!',
+        `This outfit has been saved to your history for today.`,
+        [
+          { text: 'View History', onPress: () => navigation.navigate('WornOutfits') },
+          { text: 'Generate New Outfit', onPress: generateOutfit },
+          { text: 'OK', style: 'default' }
+        ]
+      );
+    } else {
+      throw new Error(result?.message || 'Failed to record outfit');
+    }
+  } catch (error) {
+    console.error('Error recording outfit:', error);
+    Alert.alert(
+      'Error',
+      'Failed to record outfit. Please try again.',
+      [{ text: 'OK' }]
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
 // In GetOutfitScreen.js, restore the original handleSaveFavorite function:
 const handleSaveFavorite = async () => {

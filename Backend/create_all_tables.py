@@ -132,6 +132,9 @@ def create_all_tables():
                     occasion occasion,
                     weather VARCHAR(100),
                     location VARCHAR(255),
+                    -- Optional image columns for quick thumbnails
+                    image_url VARCHAR(500),
+                    image_path VARCHAR(500),
                     confidence_score DECIMAL(5,3),
                     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
                     notes TEXT,
@@ -151,6 +154,9 @@ def create_all_tables():
                     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     name VARCHAR(255) NOT NULL,
                     outfit_data JSONB,
+                    -- Optional image columns for thumbnail display
+                    image_url VARCHAR(500),
+                    image_path VARCHAR(500),
                     occasion occasion,
                     confidence_score DECIMAL(5,3),
                     times_worn INTEGER DEFAULT 0,

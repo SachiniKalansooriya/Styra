@@ -1198,11 +1198,23 @@ async def record_worn_outfit(request_data: dict, current_user: dict = Depends(ge
         worn_date = request_data.get('worn_date', datetime.now().date())
         
         logger.info(f"Recording worn outfit for user {user_id}")
-        logger.info(f"Outfit data: {outfit_data}")
+        logger.info(f"Full request data: {json.dumps(request_data, indent=2, default=str)}")
+        logger.info(f"Outfit data structure: {json.dumps(outfit_data, indent=2, default=str)}")
         
-        # Validate outfit data
+        # Enhanced validation and logging
         if not outfit_data or not outfit_data.get('items'):
+            logger.error("Missing outfit_data or items")
             raise HTTPException(status_code=400, detail="Outfit data and items are required")
+        
+        # Log item details for debugging
+        items = outfit_data.get('items', [])
+        logger.info(f"Number of items: {len(items)}")
+        for i, item in enumerate(items):
+            logger.info(f"Item {i}: {json.dumps(item, indent=2, default=str)}")
+            if isinstance(item, dict):
+                image_fields = ['image_url', 'image_path', 'image', 'path', 'uri', 'imageUri', 'imageUrl']
+                has_images = {field: item.get(field) for field in image_fields if item.get(field)}
+                logger.info(f"Item {i} image fields: {has_images}")
         
         # Use outfit history service if available
         if outfit_history_service:
@@ -1217,27 +1229,39 @@ async def record_worn_outfit(request_data: dict, current_user: dict = Depends(ge
                 )
                 
                 if result:
+                    logger.info(f"Successfully recorded outfit with ID: {result.get('outfit_id')}")
                     return {
                         "status": "success",
                         "message": "Outfit wear recorded successfully",
                         "outfit_id": result.get('outfit_id'),
                         "worn_date": str(worn_date),
-                        "user_id": user_id
+                        "user_id": user_id,
+                        "debug_info": {
+                            "items_count": len(items),
+                            "has_images": any(
+                                item.get('image_url') or item.get('image_path') or item.get('image') 
+                                for item in items if isinstance(item, dict)
+                            )
+                        }
                     }
                 else:
+                    logger.error("Outfit history service returned None")
                     raise HTTPException(status_code=500, detail="Failed to record outfit wear")
                     
             except Exception as e:
                 logger.error(f"Outfit history service error: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
                 # Fall back to simple response
                 return {
                     "status": "success",
-                    "message": "Outfit noted (limited tracking)",
+                    "message": "Outfit noted (limited tracking due to service error)",
                     "user_id": user_id,
-                    "fallback": True
+                    "fallback": True,
+                    "error_details": str(e)
                 }
         else:
-            # Outfit history service not available, return success anyway
+            # Outfit history service not available
             logger.warning("Outfit history service not available")
             return {
                 "status": "success", 
@@ -1250,8 +1274,8 @@ async def record_worn_outfit(request_data: dict, current_user: dict = Depends(ge
         raise
     except Exception as e:
         logger.exception("Record worn outfit error")
-        raise HTTPException(status_code=500, detail="Failed to record outfit wear")
-
+        raise HTTPException(status_code=500, detail=f"Failed to record outfit wear: {str(e)}")
+    
 # Trip Planning Routes (Protected)
 @app.post("/api/trip-planner/enhanced-packing")
 async def enhanced_packing_recommendations(request_data: dict, current_user: dict = Depends(get_current_user)):

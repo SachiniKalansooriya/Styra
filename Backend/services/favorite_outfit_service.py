@@ -19,21 +19,34 @@ class FavoriteOutfitService:
                 outfit_name = f"Outfit {datetime.now().strftime('%Y-%m-%d %H:%M')}"
             
             # Prepare outfit data
-            outfit_json = json.dumps(outfit_data.get('items', []))
+            outfit_items = outfit_data.get('items', []) or []
+            outfit_json = json.dumps(outfit_items)
             weather_json = json.dumps(outfit_data.get('weather_context', {}))
             occasion = outfit_data.get('occasion', 'casual')
             confidence = float(outfit_data.get('confidence', 0))
+            # Try to extract a representative image from the first item
+            image_url = None
+            image_path = None
+            try:
+                if isinstance(outfit_items, (list, tuple)) and len(outfit_items) > 0:
+                    first_item = outfit_items[0]
+                    if isinstance(first_item, dict):
+                        image_url = first_item.get('image_url') or first_item.get('image') or None
+                        image_path = first_item.get('image_path') or first_item.get('path') or None
+            except Exception:
+                image_url = None
+                image_path = None
             
             # Insert into database
             insert_query = """
                 INSERT INTO favorite_outfits 
-                (user_id, name, occasion, confidence_score, weather_context, outfit_data)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                (user_id, name, occasion, confidence_score, weather_context, outfit_data, image_url, image_path)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """
-            
+
             result = db.execute_query(insert_query, (
-                user_id, outfit_name, occasion, confidence, weather_json, outfit_json
+                user_id, outfit_name, occasion, confidence, weather_json, outfit_json, image_url, image_path
             ))
 
             # db.execute_query may return different shapes depending on the query
@@ -94,7 +107,7 @@ class FavoriteOutfitService:
         try:
             query = """
                 SELECT id, name, occasion, confidence_score, weather_context, 
-                       outfit_data, notes, times_worn, created_at, updated_at
+                       outfit_data, notes, times_worn, image_url, image_path, created_at, updated_at
                 FROM favorite_outfits
                 WHERE user_id = %s
                 ORDER BY created_at DESC
@@ -144,6 +157,8 @@ class FavoriteOutfitService:
                         'confidence': fav['confidence_score'],
                         'notes': fav['notes'],
                         'times_worn': fav['times_worn'] or 0,
+                        'image_url': fav.get('image_url'),
+                        'image_path': fav.get('image_path'),
                         'created_at': fav['created_at'].isoformat() if fav['created_at'] else None,
                         'updated_at': fav['updated_at'].isoformat() if fav['updated_at'] else None
                     }
@@ -191,7 +206,7 @@ class FavoriteOutfitService:
         try:
             query = """
                 SELECT id, user_id, name, occasion, confidence_score, weather_context,
-                       outfit_data, notes, times_worn, created_at, updated_at
+                       outfit_data, notes, times_worn, image_url, image_path, created_at, updated_at
                 FROM favorite_outfits
                 WHERE id = %s
             """
@@ -238,6 +253,8 @@ class FavoriteOutfitService:
                     'confidence': fav['confidence_score'],
                     'notes': fav['notes'],
                     'times_worn': fav['times_worn'] or 0,
+                    'image_url': fav.get('image_url'),
+                    'image_path': fav.get('image_path'),
                     'created_at': fav['created_at'].isoformat() if fav['created_at'] else None,
                     'updated_at': fav['updated_at'].isoformat() if fav['updated_at'] else None
                 }
