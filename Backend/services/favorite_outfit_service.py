@@ -35,20 +35,40 @@ class FavoriteOutfitService:
             result = db.execute_query(insert_query, (
                 user_id, outfit_name, occasion, confidence, weather_json, outfit_json
             ))
-            
-            if result:
-                favorite_id = result[0]['id']
+
+            # db.execute_query may return different shapes depending on the query
+            # - For RETURNING it returns a single dict (cursor.fetchone())
+            # - For SELECT without RETURNING it returns a list
+            # - For non-RETURNING DML it may return a boolean
+            favorite_id = None
+            try:
+                if isinstance(result, dict):
+                    # cursor.fetchone() with RealDictCursor -> dict
+                    favorite_id = result.get('id')
+                elif isinstance(result, (list, tuple)) and len(result) > 0:
+                    first = result[0]
+                    if isinstance(first, dict):
+                        favorite_id = first.get('id')
+                elif isinstance(result, bool):
+                    # No RETURNING but affected rows indicated success
+                    favorite_id = None
+            except Exception as e:
+                logger.error(f"Error parsing DB result for favorite insert: {e}")
+
+            if favorite_id:
                 logger.info(f"Outfit '{outfit_name}' saved as favorite with ID: {favorite_id}")
                 return {
                     'success': True,
                     'message': 'Outfit saved to favorites!',
                     'id': favorite_id
                 }
-            else:
-                return {
-                    'success': False,
-                    'message': 'Failed to save outfit to favorites'
-                }
+
+            # If we didn't get an ID back, provide the raw result for debugging
+            return {
+                'success': False,
+                'message': f'Failed to save outfit to favorites: {result}',
+                'raw_result': result
+            }
                 
         except Exception as e:
             logger.error(f"Error saving favorite outfit: {e}")
@@ -86,10 +106,35 @@ class FavoriteOutfitService:
             formatted_favorites = []
             for fav in favorites:
                 try:
-                    # Parse outfit data
-                    outfit_items = json.loads(fav['outfit_data']) if fav['outfit_data'] else []
-                    weather_context = json.loads(fav['weather_context']) if fav['weather_context'] else {}
-                    
+                    # Parse outfit_data which may be stored as a JSON string or
+                    # may already be returned by psycopg2 as a Python list/dict
+                    raw_outfit = fav.get('outfit_data')
+                    if raw_outfit is None:
+                        outfit_items = []
+                    elif isinstance(raw_outfit, (list, dict)):
+                        outfit_items = raw_outfit
+                    elif isinstance(raw_outfit, str):
+                        try:
+                            outfit_items = json.loads(raw_outfit)
+                        except Exception:
+                            outfit_items = []
+                    else:
+                        outfit_items = []
+
+                    # Same for weather_context
+                    raw_weather = fav.get('weather_context')
+                    if raw_weather is None:
+                        weather_context = {}
+                    elif isinstance(raw_weather, (dict, list)):
+                        weather_context = raw_weather
+                    elif isinstance(raw_weather, str):
+                        try:
+                            weather_context = json.loads(raw_weather)
+                        except Exception:
+                            weather_context = {}
+                    else:
+                        weather_context = {}
+
                     formatted_fav = {
                         'id': fav['id'],
                         'name': fav['name'],  # Use the stored name
@@ -103,8 +148,8 @@ class FavoriteOutfitService:
                         'updated_at': fav['updated_at'].isoformat() if fav['updated_at'] else None
                     }
                     formatted_favorites.append(formatted_fav)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Error parsing outfit data for favorite {fav['id']}: {e}")
+                except Exception as e:
+                    logger.error(f"Error parsing outfit data for favorite {fav.get('id')}: {e}")
                     continue
             
             return {
@@ -155,9 +200,34 @@ class FavoriteOutfitService:
             
             if result:
                 fav = result[0]
-                outfit_items = json.loads(fav['outfit_data']) if fav['outfit_data'] else []
-                weather_context = json.loads(fav['weather_context']) if fav['weather_context'] else {}
-                
+
+                # Parse outfit_data robustly (accept already-parsed lists/dicts)
+                raw_outfit = fav.get('outfit_data')
+                if raw_outfit is None:
+                    outfit_items = []
+                elif isinstance(raw_outfit, (list, dict)):
+                    outfit_items = raw_outfit
+                elif isinstance(raw_outfit, str):
+                    try:
+                        outfit_items = json.loads(raw_outfit)
+                    except Exception:
+                        outfit_items = []
+                else:
+                    outfit_items = []
+
+                raw_weather = fav.get('weather_context')
+                if raw_weather is None:
+                    weather_context = {}
+                elif isinstance(raw_weather, (dict, list)):
+                    weather_context = raw_weather
+                elif isinstance(raw_weather, str):
+                    try:
+                        weather_context = json.loads(raw_weather)
+                    except Exception:
+                        weather_context = {}
+                else:
+                    weather_context = {}
+
                 return {
                     'id': fav['id'],
                     'user_id': fav['user_id'],

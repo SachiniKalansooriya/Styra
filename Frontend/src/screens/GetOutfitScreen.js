@@ -654,10 +654,12 @@ const handleSaveFavorite = async () => {
             };
 
             const result = await favoriteOutfitService.saveFavorite(
-              1, // user_id
+              1, // user_id (kept for compatibility; backend uses JWT)
               outfitData,
               outfitName.trim()
             );
+
+            console.log('Save favorite normalized result:', result);
 
             if (result && result.success) {
               Alert.alert(
@@ -669,7 +671,9 @@ const handleSaveFavorite = async () => {
                 ]
               );
             } else {
-              throw new Error(result?.message || 'Failed to save favorite');
+              // If server returned a raw message include it for debugging
+              const msg = result?.message || (result?.raw ? JSON.stringify(result.raw) : 'Failed to save favorite');
+              throw new Error(msg);
             }
           } catch (error) {
             console.error('Error saving favorite:', error);

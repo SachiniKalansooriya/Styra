@@ -11,7 +11,38 @@ class FavoriteOutfitService {
         outfit_data: outfitData,
         name: outfitName
       });
-      return response;
+
+      // Normalize different backend response shapes so callers can rely on
+      // a consistent object: { success: boolean, message: string, id: number|null }
+      console.log('favoriteOutfitService.saveFavorite raw response:', response);
+
+      if (response === null || response === undefined) {
+        return { success: false, message: 'Empty response from server', id: null, raw: response };
+      }
+
+      if (typeof response === 'boolean' || typeof response === 'number') {
+        return { success: !!response, message: !!response ? 'Saved' : 'Failed to save', id: null, raw: response };
+      }
+
+      if (response.status) {
+        return {
+          success: response.status === 'success',
+          message: response.message || '',
+          id: response.favorite_id || response.id || null,
+          raw: response
+        };
+      }
+
+      if (typeof response.success !== 'undefined') {
+        return {
+          success: !!response.success,
+          message: response.message || '',
+          id: response.id || response.favorite_id || null,
+          raw: response
+        };
+      }
+
+      return { success: false, message: 'Unexpected server response', id: null, raw: response };
     } catch (error) {
       console.error('Error saving favorite outfit:', error);
       throw error;
