@@ -150,6 +150,7 @@ def create_all_tables():
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     name VARCHAR(255) NOT NULL,
+                    outfit_data JSONB,
                     occasion occasion,
                     confidence_score DECIMAL(5,3),
                     times_worn INTEGER DEFAULT 0,

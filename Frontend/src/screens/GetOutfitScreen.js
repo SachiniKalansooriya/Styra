@@ -620,74 +620,74 @@ const GetOutfitScreen = ({ navigation }) => {
     }
   };
 
-  const handleSaveFavorite = async () => {
-    if (!currentOutfit || !currentOutfit.items) {
-      Alert.alert('Error', 'No outfit to save as favorite');
-      return;
-    }
+// In GetOutfitScreen.js, restore the original handleSaveFavorite function:
+const handleSaveFavorite = async () => {
+  if (!currentOutfit || !currentOutfit.items) {
+    Alert.alert('Error', 'No outfit to save as favorite');
+    return;
+  }
 
-    Alert.prompt(
-      'Save as Favorite',
-      'Give this outfit a name:',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Save',
-          onPress: async (outfitName) => {
-            if (!outfitName || outfitName.trim() === '') {
-              outfitName = `Outfit ${new Date().toLocaleDateString()}`;
-            }
+  Alert.prompt(
+    'Save as Favorite',
+    'Give this outfit a name:',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Save',
+        onPress: async (outfitName) => {
+          if (!outfitName || outfitName.trim() === '') {
+            outfitName = `Outfit ${new Date().toLocaleDateString()}`;
+          }
 
-            try {
-              setLoading(true);
+          try {
+            setLoading(true);
 
-              const outfitData = {
-                items: currentOutfit.items,
-                occasion: occasion,
-                confidence: currentOutfit.confidence,
-                reason: currentOutfit.reason,
-                weather_context: weatherInfo || defaultWeatherData
-              };
+            const outfitData = {
+              items: currentOutfit.items,
+              occasion: occasion,
+              confidence: currentOutfit.confidence,
+              reason: currentOutfit.reason,
+              weather_context: weatherInfo || defaultWeatherData
+            };
 
-              const result = await favoriteOutfitService.saveFavorite(
-                1,
-                outfitData,
-                outfitName.trim()
-              );
+            const result = await favoriteOutfitService.saveFavorite(
+              1, // user_id
+              outfitData,
+              outfitName.trim()
+            );
 
-              if (result && result.success) {
-                Alert.alert(
-                  'Saved!',
-                  `"${outfitName}" has been saved to your favorites.`,
-                  [
-                    { text: 'View Favorites', onPress: () => navigation.navigate('FavoriteOutfits') },
-                    { text: 'OK', style: 'default' }
-                  ]
-                );
-              } else {
-                throw new Error(result?.message || 'Failed to save favorite');
-              }
-            } catch (error) {
-              console.error('Error saving favorite:', error);
+            if (result && result.success) {
               Alert.alert(
-                'Error',
-                'Failed to save outfit as favorite. Please try again.', 
-                [{ text: 'OK' }]
+                'Saved!',
+                `"${outfitName}" has been saved to your favorites.`,
+                [
+                  { text: 'View Favorites', onPress: () => navigation.navigate('FavoriteOutfits') },
+                  { text: 'OK', style: 'default' }
+                ]
               );
-            } finally {
-              setLoading(false);
+            } else {
+              throw new Error(result?.message || 'Failed to save favorite');
             }
-          },
+          } catch (error) {
+            console.error('Error saving favorite:', error);
+            Alert.alert(
+              'Error',
+              'Failed to save outfit as favorite. Please try again.', 
+              [{ text: 'OK' }]
+            );
+          } finally {
+            setLoading(false);
+          }
         },
-      ],
-      'plain-text',
-      `Outfit ${new Date().toLocaleDateString()}`
-    );
-  };
-
+      },
+    ],
+    'plain-text',
+    `Outfit ${new Date().toLocaleDateString()}`
+  );
+};
   const renderOccasionSelector = () => (
     <ScrollView 
       horizontal 

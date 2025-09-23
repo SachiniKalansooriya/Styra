@@ -28,6 +28,7 @@ import json
 import glob
 import uuid
 from pathlib import Path
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Depends, Request  # Add Request here
 import re
 
 # Load environment variables
@@ -696,51 +697,92 @@ async def get_outfit_history(
 # Favorite Outfit Routes (Protected)
 @app.get("/api/favorites")
 async def get_user_favorites(current_user: dict = Depends(get_current_user)):
-    """Get user's favorite outfits (protected)"""
+    """Get user's favorite outfits"""
     try:
-        user_id = current_user["user_id"]
-        logger.info(f"Getting favorites for user {user_id}")
+        user_id = current_user["user_id"]  # Use authenticated user
         
-        # Use the favorite outfit service
-        favorites = favorite_outfit_service.get_user_favorites(user_id)
+        result = favorite_outfit_service.get_user_favorites(user_id)
         
-        return {
-            "status": "success",
-            "favorites": favorites,
-            "count": len(favorites),
-            "user_id": user_id
-        }
+        return result
+        
     except Exception as e:
-        logger.error(f"Get favorites error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get favorites")
-
+        logger.error(f"Error in get_user_favorites endpoint: {e}")
+        return {
+            'status': 'error',
+            'message': f'Server error: {str(e)}',
+            'favorites': []
+        }
 @app.post("/api/favorites")
-async def save_favorite_outfit(favorite_data: dict, current_user: dict = Depends(get_current_user)):
-    """Save outfit as favorite (protected)"""
+async def save_favorite_outfit(request: Request, current_user: dict = Depends(get_current_user)):
+    """Save an outfit as favorite"""
     try:
-        user_id = current_user["user_id"]
-        favorite_data['user_id'] = user_id  # Ensure favorite belongs to authenticated user
-        logger.info(f"Saving favorite for user {user_id}: {favorite_data.get('name', 'Unknown')}")
+        data = await request.json()
         
-        # Use the favorite outfit service
-        result = favorite_outfit_service.save_favorite(favorite_data)
+        # Use the authenticated user's ID, not hardcoded 1
+        user_id = current_user["user_id"]  # Get from JWT token
+        outfit_data = data.get('outfit_data', {})
+        name = data.get('name', f"Outfit {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        
+        logger.info(f"Saving favorite for authenticated user: {user_id}")
+        
+        # Validate required data
+        if not outfit_data:
+            return {
+                'status': 'error',
+                'message': 'outfit_data is required'
+            }
+        
+        # Save the favorite
+        result = favorite_outfit_service.save_favorite(user_id, outfit_data, name)
         
         if result.get('success'):
             return {
-                "status": "success",
-                "favorite_id": result["id"],
-                "message": "Favorite saved successfully",
-                "user_id": user_id
+                'status': 'success',
+                'message': result.get('message', 'Favorite saved successfully'),
+                'favorite_id': result.get('id')
             }
         else:
-            logger.error(f"Service returned error: {result}")
-            raise HTTPException(status_code=500, detail=result.get('message', 'Failed to save favorite'))
+            return {
+                'status': 'error',
+                'message': result.get('message', 'Failed to save favorite')
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in save_favorite_outfit endpoint: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return {
+            'status': 'error',
+            'message': f'Server error: {str(e)}'
+        }
+    
+@app.put("/api/favorites/{favorite_id}")
+async def update_favorite_outfit(favorite_id: int, updates: dict, current_user: dict = Depends(get_current_user)):
+    """Update a favorite outfit (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        
+        # Verify the favorite belongs to the user
+        favorite = favorite_outfit_service.get_favorite_by_id(favorite_id)
+        if not favorite or favorite.get('user_id') != user_id:
+            raise HTTPException(status_code=404, detail="Favorite not found")
+        
+        result = favorite_outfit_service.update_favorite(user_id, favorite_id, updates)
+        
+        if result.get('status') == 'success':
+            return {
+                "status": "success",
+                "message": result.get('message', 'Favorite updated successfully')
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result.get('message', 'Failed to update favorite'))
+            
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Save favorite error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save favorite")
-
+        logger.error(f"Update favorite error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update favorite")
+    
 @app.delete("/api/favorites/{favorite_id}")
 async def delete_favorite_outfit(favorite_id: int, current_user: dict = Depends(get_current_user)):
     """Delete a favorite outfit (protected)"""

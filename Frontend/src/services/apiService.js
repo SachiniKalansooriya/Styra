@@ -102,6 +102,13 @@ class ApiService {
     }
   }
 
+  async put(endpoint, data, options = {}) {
+  return this.request(endpoint, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+    ...options,
+  });
+}
   async post(endpoint, data, options = {}) {
     return this.request(endpoint, {
       method: 'POST',
