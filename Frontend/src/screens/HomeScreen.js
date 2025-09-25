@@ -73,7 +73,6 @@ const HomeScreen = ({ navigation, onLogout }) => {
           'Wardrobe Setup Needed',
           data.outfit.message || 'Please add clothes with proper categories (tops, bottoms, shoes)',
           [
-            { text: 'Add Sample Items', onPress: () => addSampleWardrobe() },
             { text: 'Add Manually', onPress: () => navigation.navigate('AddClothes') },
             { text: 'Try Anyway', onPress: () => navigation.navigate('GetOutfit') }
           ]
@@ -94,7 +93,6 @@ const HomeScreen = ({ navigation, onLogout }) => {
           'Wardrobe Ready!',
           'Add a few more items for better AI recommendations, or try our sample wardrobe.',
           [
-            { text: 'Add Sample Items', onPress: () => addSampleWardrobe() },
             { text: 'Add Items', onPress: () => navigation.navigate('AddClothes') },
             { text: 'Try Manual', onPress: () => navigation.navigate('GetOutfit') }
           ]
@@ -142,7 +140,6 @@ const HomeScreen = ({ navigation, onLogout }) => {
       }
     } catch (error) {
       console.error('Error adding sample wardrobe:', error);
-      Alert.alert('Error', 'Failed to add sample wardrobe items');
     }
   };
 

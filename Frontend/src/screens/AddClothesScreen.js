@@ -37,16 +37,32 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
   });
   const cameraRef = useRef();
 
+  // Normalize analyzer/category values so subtypes map to canonical categories
+  const normalizeCategory = (cat) => {
+    if (!cat) return '';
+    const c = String(cat).toLowerCase();
+    // map common footwear subtypes to shoes
+    const footwear = ['heel', 'heels', 'sandal', 'sandals', 'slipper', 'slippers', 'flipflop', 'flip-flop', 'flip flop', 'loafer', 'loafers'];
+    if (footwear.includes(c) || footwear.some(f => c.includes(f))) return 'shoes';
+    // normalize skirts to bottoms
+    if (c.includes('skirt')) return 'bottoms';
+    // dresses explicit
+    if (c.includes('dress')) return 'dresses';
+    // jerseys as jersey
+    if (c.includes('jersey')) return 'jersey';
+    // default: return original key if it matches known categories, otherwise return as-is
+    return cat;
+  };
+
   useEffect(() => {
     // Check if we received processed item data from params
     if (navigation.params?.processedItem) {
       const processed = navigation.params.processedItem;
       setProcessedItem(processed);
       setCapturedImage(processed.imageData.localUri);
-      
       setItemDetails({
         name: '',
-        category: processed.suggestedCategory || '',
+        category: normalizeCategory(processed.suggestedCategory) || '',
         color: processed.suggestedColor || '',
         season: 'all',
         occasion: processed.suggestedOccasion || '',
@@ -87,7 +103,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
           
           setItemDetails({
             name: '',
-            category: processed.suggestedCategory || '',
+            category: normalizeCategory(processed.suggestedCategory) || '',
             color: processed.suggestedColor || '',
             season: 'all',
             occasion: processed.suggestedOccasion || '',
@@ -149,7 +165,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
         
         setItemDetails({
           name: '',
-          category: processed.suggestedCategory || '',
+          category: normalizeCategory(processed.suggestedCategory) || '',
           color: processed.suggestedColor || '',
           season: 'all',
         });
@@ -187,7 +203,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
       const finalItemData = {
         ...processedItem,
         name: itemDetails.name,
-        category: itemDetails.category,
+        category: normalizeCategory(itemDetails.category) || itemDetails.category,
         color: itemDetails.color || processedItem?.suggestedColor || '',
         season: itemDetails.season,
         occasion: itemDetails.occasion || processedItem?.suggestedOccasion || '',
@@ -255,6 +271,9 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
     { key: 'dresses', label: 'Dresses', emoji: '👗' },
     { key: 'jersey', label: 'Jersey', emoji: '🏀' },
     { key: 'shoes', label: 'Shoes', emoji: '👟' },
+    { key: 'heels', label: 'Heels', emoji: '👠' },
+    { key: 'sandals', label: 'Sandals', emoji: '🩴' },
+    { key: 'slippers', label: 'Slippers', emoji: '🥿' },
     { key: 'accessories', label: 'Accessories', emoji: '👜' },
     { key: 'outerwear', label: 'Outerwear', emoji: '🧥' },
     { key: 'sportswear', label: 'Sportswear', emoji: '🏃' },

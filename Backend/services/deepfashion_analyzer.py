@@ -1,9 +1,9 @@
 from transformers import CLIPProcessor, CLIPModel, pipeline
 import torch
 from PIL import Image
-import io  # MISSING IMPORT
+import io  
 import logging
-import time  # MISSING IMPORT
+import time  
 
 class DeepFashionAnalyzer:
     def __init__(self):
@@ -19,13 +19,6 @@ class DeepFashionAnalyzer:
             # Use standard CLIP instead of non-existent marqo model
             self.fashion_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
             self.fashion_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-            
-            # Skip the category classifier for now - causes issues
-            # self.category_classifier = pipeline(
-            #     "image-classification",
-            #     model="adityavithaldas/Fashion_Category_Classifier"
-            # )
-            
             self.ai_loaded = True
             logging.info("DeepFashion models loaded successfully!")
             

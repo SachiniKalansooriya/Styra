@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 class FavoriteOutfitService:
     def __init__(self):
-        # Table already exists from your schema, no need to create it
         pass
 
     def _normalize_occasion(self, raw_occasion) -> str:
@@ -94,10 +93,6 @@ class FavoriteOutfitService:
                 user_id, outfit_name, occasion, confidence, weather_json, outfit_json, image_url, image_path
             ))
 
-            # db.execute_query may return different shapes depending on the query
-            # - For RETURNING it returns a single dict (cursor.fetchone())
-            # - For SELECT without RETURNING it returns a list
-            # - For non-RETURNING DML it may return a boolean
             favorite_id = None
             try:
                 if isinstance(result, dict):

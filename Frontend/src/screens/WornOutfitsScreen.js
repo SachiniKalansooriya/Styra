@@ -254,13 +254,6 @@ const WornOutfitsScreen = ({ navigation, route }) => {
           </View>
         )}
         
-        {/* Debug information - remove in production */}
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
-            Debug: ID={item.id}, Items={item.outfit_data?.items?.length || 0}, 
-            Image={item.image_path ? 'has path' : 'no path'}
-          </Text>
-        </View>
       </View>
     );
   };
