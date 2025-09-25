@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import favoriteOutfitService from '../services/favoriteOutfitService';
+import outfitHistoryService from '../services/outfitHistoryService';
 
 const FavoriteOutfitsScreen = ({ navigation }) => {
   console.log('FavoriteOutfitsScreen component rendering');
@@ -94,8 +95,64 @@ const FavoriteOutfitsScreen = ({ navigation }) => {
             text: 'Yes',
             onPress: async () => {
               try {
-                console.log('Marking outfit as worn:', favoriteId);
-                Alert.alert('Success', 'Outfit marked as worn today!');
+                // Find the selected favorite data
+                const fav = favorites.find(f => f.id === favoriteId);
+                if (!fav) throw new Error('Favorite not found');
+
+                // Normalize favorite shape: ensure `outfit_data` with `items` exists
+                let outfitForBackend = fav.outfit_data || fav;
+                if (!outfitForBackend.items && Array.isArray(fav.items)) {
+                  outfitForBackend = {
+                    ...outfitForBackend,
+                    items: fav.items.map(item => ({
+                      id: item.id,
+                      name: item.name || item.item || null,
+                      category: item.category,
+                      color: item.color,
+                      image_path: item.image_path,
+                      image_url: item.image_url || item.image_path || null,
+                      imageUri: item.imageUri,
+                      imageUrl: item.imageUrl,
+                      image: item.image,
+                      path: item.path,
+                      uri: item.uri
+                    }))
+                  };
+                }
+
+                const response = await outfitHistoryService.recordWornOutfit(
+                  outfitForBackend,
+                  fav.occasion || null,
+                  fav.weather_context || null,
+                  fav.location || null,
+                  new Date().toISOString().split('T')[0]
+                );
+
+                if (response && response.status === 'success') {
+                  // Build a lightweight record for immediate display in history
+                  const wornDate = response.worn_date || new Date().toISOString().split('T')[0];
+                  const recorded = {
+                    id: response.outfit_id || response.id || Math.floor(Math.random() * 1000000),
+                    outfit_data: outfitForBackend,
+                    worn_date: wornDate,
+                    occasion: fav.occasion || null,
+                    weather: fav.weather_context || null,
+                    location: fav.location || null,
+                    image_path: outfitForBackend.items && outfitForBackend.items[0] ? outfitForBackend.items[0].image_path : null,
+                  };
+
+                  // Offer quick navigation to the Worn Outfits history and pass the recorded outfit
+                  Alert.alert(
+                    'Success',
+                    'Outfit marked as worn today!',
+                    [
+                      { text: 'View History', onPress: () => { setModalVisible(false); navigation.navigate('WornOutfits', { newWornOutfit: recorded }); } },
+                      { text: 'OK', style: 'default' }
+                    ]
+                  );
+                } else {
+                  throw new Error(response?.message || 'Failed to record worn outfit');
+                }
               } catch (error) {
                 console.error('Error marking outfit as worn:', error);
                 Alert.alert('Error', 'Failed to mark outfit as worn.');

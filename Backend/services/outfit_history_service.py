@@ -212,6 +212,25 @@ class OutfitHistoryService:
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
             
+            # Before inserting, check if an identical outfit has already been recorded
+            # for the same user on the same date. If so, return the existing id.
+            try:
+                check_sql = """
+                    SELECT id FROM outfit_history
+                    WHERE user_id = %s
+                      AND DATE(worn_date) = DATE(%s)
+                      AND outfit_data = %s::jsonb
+                    LIMIT 1
+                """
+                cursor.execute(check_sql, (user_id, worn_date, json.dumps(outfit_data)))
+                existing = cursor.fetchone()
+                if existing:
+                    logger.info(f"Duplicate worn outfit detected for user {user_id}, returning existing id {existing[0]}")
+                    cursor.close()
+                    return {'outfit_id': existing[0], 'duplicate': True}
+            except Exception as e:
+                logger.warning(f"Duplicate check failed: {e}")
+
             query = """
                 INSERT INTO outfit_history (user_id, worn_date, occasion, weather, location, image_url, image_path, outfit_data, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)

@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import outfitHistoryService from '../services/outfitHistoryService';
 import API_CONFIG from '../config/api';
 
-const WornOutfitsScreen = ({ navigation }) => {
+const WornOutfitsScreen = ({ navigation, route }) => {
   const [wornOutfits, setWornOutfits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,13 +30,43 @@ const WornOutfitsScreen = ({ navigation }) => {
     if (navigation.addListener) {
       const unsubscribe = navigation.addListener('focus', () => {
         console.log('WornOutfits screen focused - reloading data');
-        loadWornOutfits();
+        // Check for a newly recorded outfit passed via navigation params (safe for v5+)
+        const newRecorded = route?.params?.newWornOutfit;
+        if (newRecorded) {
+          console.log('Prepending new worn outfit from params:', newRecorded);
+          setWornOutfits(prev => [newRecorded, ...(prev || [])]);
+          // Clear the param to avoid duplicating
+          try {
+            if (navigation.setParams) navigation.setParams({ newWornOutfit: null });
+            if (route && route.params) route.params.newWornOutfit = null;
+          } catch (e) {
+            console.log('Could not clear navigation param:', e);
+          }
+        } else {
+          loadWornOutfits();
+        }
       });
       
       // Cleanup on unmount
       return unsubscribe;
     }
   }, [navigation]);
+
+  // Also respond directly to route params changes (more reliable across navigation stacks)
+  useEffect(() => {
+    const newRecorded = route?.params?.newWornOutfit;
+    if (newRecorded) {
+      console.log('Detected newWornOutfit via route.params useEffect:', newRecorded);
+      setWornOutfits(prev => [newRecorded, ...(prev || [])]);
+      // clear param to avoid duplication
+      try {
+        if (navigation.setParams) navigation.setParams({ newWornOutfit: null });
+        if (route && route.params) route.params.newWornOutfit = null;
+      } catch (e) {
+        console.log('Could not clear newWornOutfit param:', e);
+      }
+    }
+  }, [route?.params?.newWornOutfit]);
 
   const loadWornOutfits = async () => {
     try {

@@ -23,6 +23,10 @@ const API_CONFIG = {
   HEADERS: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    // Prevent intermediate caches from returning stale responses
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
   },
 };
 

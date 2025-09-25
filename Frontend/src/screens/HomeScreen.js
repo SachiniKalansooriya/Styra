@@ -664,6 +664,24 @@ const HomeScreen = ({ navigation, onLogout }) => {
 
               {/* Removed Most Worn and Last Added cards per request */}
             </View>
+
+            {/* Worn Outfits Wide Feature Card - placed after the grid so it can be full width */}
+            <TouchableOpacity
+              style={[styles.featureCard, styles.featureWideCard, { marginTop: 10 }]}
+              onPress={() => navigation.navigate('WornOutfits')}
+            >
+              <LinearGradient colors={[ '#F7F3E8', '#F0E9D8' ]} style={styles.featureGradient}>
+                <View style={styles.featureContent}>
+                  <View style={styles.featureLeft}>
+                    <Text style={styles.featureTitle}>Worn Outfits</Text>
+                    <Text style={styles.featureSubtitle}>See what you've worn recently</Text>
+                  </View>
+                  <View style={styles.featureRight}>
+                    <Ionicons name="calendar" size={40} color="#8A724C" />
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
           <View style={styles.bottomSpacing} />
         </ScrollView>
@@ -880,6 +898,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  featureWideCard: {
+    width: '100%',
+    marginBottom: 15,
   },
   featureGradient: {
     padding: 20,

@@ -249,7 +249,9 @@ const GetOutfitScreen = ({ navigation }) => {
         };
       }
       
-      const data = await apiService.post('/api/outfit/ai-recommendation', requestData);
+  // Add a nonce to avoid cached responses and force new generation
+  requestData.nonce = Date.now();
+  const data = await apiService.post('/api/outfit/ai-recommendation', requestData);
       
       console.log('API Response:', data);
       
@@ -333,7 +335,9 @@ const GetOutfitScreen = ({ navigation }) => {
       
       console.log('Generating multi-occasion outfits:', requestData);
       
-      const data = await apiService.post('/api/outfit/multiple-recommendations', requestData);
+  // Add a nonce to force fresh multi-outfit generation
+  requestData.nonce = Date.now();
+  const data = await apiService.post('/api/outfit/multiple-recommendations', requestData);
       
       console.log('Multi-outfit API Response:', data);
       
@@ -510,7 +514,9 @@ const GetOutfitScreen = ({ navigation }) => {
       
       console.log('Regenerating item:', itemCategory, 'Current item ID:', currentItem?.id, requestData);
       
-      const response = await apiService.post('/api/outfit/regenerate-item', requestData);
+  // Add nonce to regenerate-item request to avoid cached results
+  requestData.nonce = Date.now();
+  const response = await apiService.post('/api/outfit/regenerate-item', requestData);
       
       if (response && response.status === 'success') {
         setCurrentOutfit(response.outfit);
@@ -561,11 +567,11 @@ const GetOutfitScreen = ({ navigation }) => {
     Alert.alert('Error', 'No outfit to record');
     return;
   }
-
   try {
     setLoading(true);
-    
-    let location = null;
+
+    // Resolve current GPS-based human-readable location if possible
+    let humanLocation = null;
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
@@ -574,30 +580,27 @@ const GetOutfitScreen = ({ navigation }) => {
           latitude: locationData.coords.latitude,
           longitude: locationData.coords.longitude,
         });
-        
+
         if (reverseGeocode.length > 0) {
           const address = reverseGeocode[0];
-          location = `${address.city || ''}, ${address.region || ''}`.trim().replace(/^,|,$/, '');
+          humanLocation = `${address.city || ''}${address.region ? (', ' + address.region) : ''}`.trim().replace(/^,|,$/, '');
         }
       }
     } catch (locationError) {
       console.log('Could not get location:', locationError);
-      location = 'Unknown Location';
+      humanLocation = 'Unknown Location';
     }
 
-    // FIXED: Create proper outfit data structure for backend
     const outfitForBackend = {
       items: currentOutfit.items.map(item => ({
         id: item.id,
-        name: item.name,
+        name: item.name || item.item || null,
         category: item.category,
         color: item.color,
         brand: item.brand,
         season: item.season,
-        // CRITICAL: Ensure image fields are included
         image_path: item.image_path,
-        image_url: item.image_url || item.image_path,
-        // Add any other fields that might contain images
+        image_url: item.image_url || item.image_path || null,
         imageUri: item.imageUri,
         imageUrl: item.imageUrl,
         image: item.image,
@@ -609,47 +612,47 @@ const GetOutfitScreen = ({ navigation }) => {
       occasion: occasion
     };
 
-    console.log('Sending outfit data to backend:', JSON.stringify(outfitForBackend, null, 2));
+    console.log('Recording worn outfit via outfitHistoryService:', outfitForBackend);
 
-    // Call the backend API directly instead of using outfitHistoryService
-    const response = await fetch(`${API_CONFIG.primary}/api/outfit/wear`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${await AsyncStorage.getItem('userToken')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+    const wornDate = new Date().toISOString().split('T')[0];
+
+    const response = await outfitHistoryService.recordWornOutfit(
+      outfitForBackend,
+      occasion,
+      weatherInfo?.condition || weatherInfo || 'unknown',
+      humanLocation,
+      wornDate
+    );
+
+    console.log('Record worn response:', response);
+
+    if (response && response.status === 'success') {
+      const recorded = {
+        id: response.outfit_id || response.id || Math.floor(Math.random() * 1000000),
         outfit_data: outfitForBackend,
+        worn_date: response.worn_date || wornDate,
         occasion: occasion,
-        weather: weatherInfo?.condition || 'unknown',
-        location: location,
-        worn_date: new Date().toISOString().split('T')[0]
-      })
-    });
+        weather: weatherInfo?.condition || null,
+        location: humanLocation || null,
+        image_path: outfitForBackend.items && outfitForBackend.items[0] ? outfitForBackend.items[0].image_path : null,
+      };
 
-    const result = await response.json();
-    console.log('Backend response:', result);
-
-    if (result && result.status === 'success') {
       Alert.alert(
         'Outfit Recorded!',
-        `This outfit has been saved to your history for today.`,
+        'This outfit has been saved to your history for today.',
         [
-          { text: 'View History', onPress: () => navigation.navigate('WornOutfits') },
+          { text: 'View History', onPress: () => navigation.navigate('WornOutfits', { newWornOutfit: recorded }) },
           { text: 'Generate New Outfit', onPress: generateOutfit },
           { text: 'OK', style: 'default' }
         ]
       );
     } else {
-      throw new Error(result?.message || 'Failed to record outfit');
+      const msg = response?.message || JSON.stringify(response);
+      throw new Error(msg || 'Failed to record outfit');
     }
   } catch (error) {
     console.error('Error recording outfit:', error);
-    Alert.alert(
-      'Error',
-      'Failed to record outfit. Please try again.',
-      [{ text: 'OK' }]
-    );
+    Alert.alert('Error', 'Failed to record outfit. Please try again.');
   } finally {
     setLoading(false);
   }
@@ -1134,7 +1137,7 @@ const handleSaveFavorite = async () => {
           <View style={styles.buttonRow}>
             <TouchableOpacity 
               style={styles.dislikeButton} 
-              onPress={handleDislikeOutfit}
+              onPress={() => { setCurrentOutfit(null); handleDislikeOutfit(); }}
             >
               <Ionicons name="thumbs-down" size={20} color="#fff" />
               <Text style={styles.buttonText}>Try Again</Text>
@@ -1146,6 +1149,24 @@ const handleSaveFavorite = async () => {
             >
               <Ionicons name="heart-outline" size={20} color="#fff" />
               <Text style={styles.buttonText}>Favorite</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.likeButton} 
+              onPress={handleLikeOutfit}
+            >
+              <Ionicons name="heart" size={20} color="#fff" />
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.wearButton} 
+              onPress={handleWearOutfit}
+            >
+              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Text style={styles.buttonText}>Wear This</Text>
             </TouchableOpacity>
           </View>
         </View>

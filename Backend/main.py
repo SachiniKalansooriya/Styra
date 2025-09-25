@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 import json
 import glob
 import uuid
+import random
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Depends, Request  # Add Request here
 import re
@@ -1173,6 +1174,121 @@ async def get_multiple_outfit_recommendations(request_data: dict, current_user: 
         logger.error(f"Multiple recommendations error: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate multiple recommendations")
 
+
+@app.post("/api/outfit/regenerate-item")
+async def regenerate_outfit_item(request_data: dict, current_user: dict = Depends(get_current_user)):
+    """Regenerate/swap one item in the provided outfit (protected)"""
+    try:
+        user_id = current_user["user_id"]
+        current_outfit = request_data.get('current_outfit') or {}
+        item_category = (request_data.get('item_category') or '').lower()
+        current_item_id = request_data.get('current_item_id')
+        occasion = request_data.get('occasion') or current_outfit.get('occasion') or 'casual'
+
+        logger.info(f"Regenerate item request for user {user_id}: category={item_category}, current_item_id={current_item_id}")
+
+        # Determine weather context from current_outfit or request
+        weather_ctx = request_data.get('weather') or current_outfit.get('weather_context') or {
+            'temperature': 22,
+            'condition': 'partly cloudy'
+        }
+
+        # Get wardrobe items and find candidates in the requested category
+        wardrobe_items = enhanced_outfit_service.get_user_wardrobe_items(user_id)
+        candidates = [w for w in wardrobe_items if w.get('category') and w.get('category').lower() == item_category]
+
+        # Exclude the current item if provided
+        filtered = [c for c in candidates if not current_item_id or c.get('id') != current_item_id]
+
+        alternatives_available = len(candidates)
+
+        if not filtered:
+            # No alternative other than current available
+            logger.warning(f'No alternative items found in category {item_category} excluding current item')
+            return {
+                'status': 'error',
+                'message': f'No alternative items available for category {item_category}',
+                'outfit': None,
+                'replaced_item': None
+            }
+
+        # Score candidates using the service scoring function
+        scored = []
+        for cand in filtered:
+            try:
+                score = enhanced_outfit_service.calculate_item_compatibility_score(cand, weather_ctx, occasion)
+            except Exception:
+                score = 0
+            scored.append((cand, score))
+
+        # Sort by score descending
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        # Choose replacement from top-N to add variation on repeated regenerates
+        top_n = min(3, len(scored))
+        top_candidates = [c for c, s in scored[:top_n]]
+        replaced_item = random.choice(top_candidates)
+        logger.info(f"Regenerate candidates (top {top_n}): {[c.get('id') for c in top_candidates]}; chosen: {replaced_item.get('id')}")
+
+        # Build new outfit by replacing the first matching category item in current_outfit
+        new_items = []
+        replaced = False
+        current_items = current_outfit.get('items', []) if isinstance(current_outfit.get('items', []), list) else []
+        for it in current_items:
+            if not replaced and it.get('category') and it.get('category').lower() == item_category:
+                new_items.append(replaced_item)
+                replaced = True
+            else:
+                new_items.append(it)
+
+        if not replaced:
+            # If current outfit did not have that category, append the replacement
+            new_items.append(replaced_item)
+
+        # Recompute a simple confidence as average of item compatibility scores
+        total_score = 0
+        count = 0
+        for it in new_items:
+            try:
+                s = enhanced_outfit_service.calculate_item_compatibility_score(it, weather_ctx, occasion)
+            except Exception:
+                s = 50
+            total_score += s
+            count += 1
+
+        confidence = int(total_score / count) if count > 0 else 50
+
+        reason = enhanced_outfit_service._generate_outfit_reason(new_items, weather_ctx, occasion)
+
+        new_outfit = {
+            'id': f'user_outfit_{uuid.uuid4().hex[:8]}',
+            'items': new_items,
+            'confidence': confidence,
+            'reason': reason,
+            'weather_context': weather_ctx,
+            'occasion': occasion,
+            'ai_enhanced': enhanced_outfit_service.ai_loaded,
+            'generated_at': datetime.now().isoformat()
+        }
+
+        response = {
+            'status': 'success',
+            'outfit': new_outfit,
+            'replaced_item': {
+                'new_item': replaced_item.get('name') or replaced_item.get('id'),
+                'item_id': replaced_item.get('id'),
+                'alternatives_available': alternatives_available
+            }
+        }
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception('Regenerate item error')
+        raise HTTPException(status_code=500, detail=f'Failed to regenerate item: {str(e)}')
+
 @app.post("/api/outfit/wear")
 async def record_worn_outfit(request_data: dict, current_user: dict = Depends(get_current_user)):
     """Record when a user wears an outfit (protected)"""
@@ -1217,6 +1333,15 @@ async def record_worn_outfit(request_data: dict, current_user: dict = Depends(ge
                 
                 if result:
                     logger.info(f"Successfully recorded outfit with ID: {result.get('outfit_id')}")
+                    if result.get('duplicate'):
+                        return {
+                            "status": "success",
+                            "message": "Outfit already recorded for this date",
+                            "outfit_id": result.get('outfit_id'),
+                            "duplicate": True,
+                            "worn_date": str(worn_date),
+                            "user_id": user_id
+                        }
                     return {
                         "status": "success",
                         "message": "Outfit wear recorded successfully",
