@@ -279,10 +279,14 @@ class AIEnhancedOutfitService:
             total_score = 0
             score_count = 0
             
-            # Required categories
+            # Required categories with common variant names to match frontend inputs
             required_categories = ['tops', 'bottoms']
             for req_cat in required_categories:
-                possible_cats = [req_cat, req_cat[:-1], 'dresses' if req_cat == 'tops' else req_cat]
+                if req_cat == 'tops':
+                    possible_cats = ['tops', 'top', 'shirts', 'shirt', 't-shirts', 't-shirt', 'blouses', 'blouse', 'jersey']
+                else:
+                    # bottoms
+                    possible_cats = ['bottoms', 'bottom', 'pants', 'pant', 'jeans', 'shorts', 'skirt', 'skirts']
                 found_item = None
 
                 for cat_variant in possible_cats:
@@ -304,12 +308,24 @@ class AIEnhancedOutfitService:
             # Optional categories
             optional_categories = ['shoes', 'outerwear']
             for opt_cat in optional_categories:
-                if opt_cat in scored_items and scored_items[opt_cat]:
+                # Accept common shoe synonyms as well
+                shoe_variants = ['shoes', 'shoe', 'sneakers', 'boots', 'sandals', 'flip-flops', 'loafers', 'espadrilles', 'moccasins', 'heels']
+                candidates_key = None
+                if opt_cat == 'shoes':
+                    # pick the first matching shoe category key present in scored_items
+                    for sv in shoe_variants:
+                        if sv in scored_items and scored_items[sv]:
+                            candidates_key = sv
+                            break
+                else:
+                    candidates_key = opt_cat
+
+                if candidates_key and candidates_key in scored_items and scored_items[candidates_key]:
                     if opt_cat == 'shoes':
-                        chosen = scored_items[opt_cat][0]
+                        chosen = scored_items[candidates_key][0]
                         if variation:
-                            top_n = min(3, len(scored_items[opt_cat]))
-                            chosen = scored_items[opt_cat][random.randrange(top_n)]
+                            top_n = min(3, len(scored_items[candidates_key]))
+                            chosen = scored_items[candidates_key][random.randrange(top_n)]
                         outfit_items.append(chosen[0])
                         total_score += chosen[1]
                         score_count += 1

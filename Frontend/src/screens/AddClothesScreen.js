@@ -253,19 +253,31 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
     { key: 'tops', label: 'Tops', emoji: '👕' },
     { key: 'bottoms', label: 'Bottoms', emoji: '👖' },
     { key: 'dresses', label: 'Dresses', emoji: '👗' },
+    { key: 'skirts', label: 'Skirts', emoji: '🩳' },
+    { key: 'jersey', label: 'Jersey', emoji: '🏀' },
     { key: 'shoes', label: 'Shoes', emoji: '👟' },
+    { key: 'sandals', label: 'Sandals', emoji: '🩴' },
     { key: 'accessories', label: 'Accessories', emoji: '👜' },
     { key: 'outerwear', label: 'Outerwear', emoji: '🧥' },
     { key: 'sportswear', label: 'Sportswear', emoji: '🏃' },
     { key: 'formal', label: 'Formal', emoji: '🤵' },
     { key: 'sleepwear', label: 'Sleepwear', emoji: '🛌' },
     { key: 'underwear', label: 'Underwear', emoji: '🩲' },
+    { key: 'loafers', label: 'Loafers', emoji: '🥿' },
+    { key: 'boots', label: 'Boots', emoji: '🥾' },
+    { key: 'heels', label: 'Heels', emoji: '👠' },
+    { key: 'flip-flops', label: 'Flip-flops', emoji: '🩴' },
+    { key: 'espadrilles', label: 'Espadrilles', emoji: '🩰' },
+    { key: 'moccasins', label: 'Moccasins', emoji: '👞' },
+    { key: 'slingbacks', label: 'Slingbacks', emoji: '👡' }
   ];
 
   const colors = [
-    'Black', 'White', 'Gray', 'Red', 'Blue', 'Green', 
+    'Black', 'White', 'Gray', 'Red', 'Blue', 'Green',
     'Yellow', 'Pink', 'Purple', 'Brown', 'Orange', 'Beige',
-    'Multicolor', 'Metallic', 'Pastel'
+    'Navy', 'Turquoise', 'Teal', 'Maroon', 'Olive', 'Mustard',
+    'Cream', 'Coral', 'Lavender', 'Mint', 'Khaki', 'Bronze',
+    'Gold', 'Silver', 'Multicolor', 'Pastel', 'Black & White', 'Charcoal'
   ];
 
   const seasons = [

@@ -51,19 +51,23 @@ class DeepFashionAnalyzer:
         # Define comprehensive fashion categories
         categories = [
             "dress", "shirt", "blouse", "t-shirt", "tank top", "sweater",
-            "pants", "jeans", "shorts", "skirt", "leggings", 
-            "jacket", "coat", "blazer", "cardigan", "hoodie",
-            "shoes", "boots", "sneakers", "sandals", "heels"
+            "pants", "jeans", "shorts", "skirt", "skirts", "leggings", 
+            "jacket", "coat", "blazer", "cardigan", "hoodie", "jersey",
+            "shoes", "boots", "sneakers", "sandals", "flip-flops", "heels",
+            "sandals", "slingbacks", "loafers", "moccasins", "espadrilles"
         ]
         
         colors = [
             "red", "blue", "green", "yellow", "black", "white",
-            "pink", "purple", "orange", "brown", "gray", "beige"
+            "pink", "purple", "orange", "brown", "gray", "beige",
+            "navy", "turquoise", "teal", "maroon", "olive", "mustard",
+            "cream", "coral", "lavender", "mint", "khaki", "bronze",
+            "gold", "silver", "multi", "pastel"
         ]
         
         occasions = [
             "casual everyday wear", "business professional", "formal evening",
-            "workout athletic wear", "party night out", "romantic date"
+            "workout athletic wear", "party night out", "romantic date", "beach", "holiday", "streetwear"
         ]
         
         # Get category using CLIP
@@ -92,12 +96,33 @@ class DeepFashionAnalyzer:
         
         # Map categories to your system
         category_mapping = {
-            "dress": "dresses", "shirt": "tops", "blouse": "tops", "t-shirt": "tops",
-            "tank top": "tops", "sweater": "tops", "pants": "bottoms", "jeans": "bottoms",
-            "shorts": "bottoms", "skirt": "bottoms", "leggings": "bottoms",
-            "jacket": "outerwear", "coat": "outerwear", "blazer": "outerwear",
-            "cardigan": "outerwear", "hoodie": "tops", "shoes": "shoes",
-            "boots": "shoes", "sneakers": "shoes", "sandals": "shoes", "heels": "shoes"
+            "dress": "dresses",
+            "shirt": "tops",
+            "blouse": "tops",
+            "t-shirt": "tops",
+            "tank top": "tops",
+            "sweater": "tops",
+            "jersey": "tops",
+            "pants": "bottoms",
+            "jeans": "bottoms",
+            "shorts": "bottoms",
+            "skirt": "bottoms",
+            "skirts": "bottoms",
+            "leggings": "bottoms",
+            "jacket": "outerwear",
+            "coat": "outerwear",
+            "blazer": "outerwear",
+            "cardigan": "outerwear",
+            "hoodie": "tops",
+            "shoes": "shoes",
+            "boots": "shoes",
+            "sneakers": "shoes",
+            "sandals": "shoes",
+            "flip-flops": "shoes",
+            "heels": "shoes",
+            "espadrilles": "shoes",
+            "loafers": "shoes",
+            "moccasins": "shoes"
         }
         
         raw_category = categories[best_category_idx]
@@ -153,9 +178,15 @@ class DeepFashionAnalyzer:
         """MISSING METHOD - Added service status"""
         return {
             'ai_models_loaded': self.ai_loaded,
-            'supported_categories': ['tops', 'bottoms', 'dresses', 'outerwear', 'shoes'],
-            'supported_colors': ['Red', 'Blue', 'Green', 'Yellow', 'Black', 'White', 'Pink', 'Purple', 'Orange', 'Brown', 'Gray', 'Beige'],
-            'supported_occasions': ['casual', 'work', 'formal', 'workout', 'party', 'datenight'],
+            'supported_categories': [
+                'tops', 'bottoms', 'dresses', 'outerwear', 'shoes', 'accessories',
+                'skirts', 'jersey', 'sportswear', 'sneakers', 'sandals', 'formal'
+            ],
+            'supported_colors': [
+                'Red', 'Blue', 'Green', 'Yellow', 'Black', 'White', 'Pink', 'Purple', 'Orange', 'Brown', 'Gray', 'Beige',
+                'Navy', 'Turquoise', 'Teal', 'Maroon', 'Olive', 'Mustard', 'Cream', 'Coral', 'Lavender', 'Mint', 'Khaki', 'Bronze', 'Gold', 'Silver', 'Multi', 'Pastel'
+            ],
+            'supported_occasions': ['casual', 'work', 'formal', 'workout', 'party', 'datenight', 'beach', 'holiday', 'streetwear'],
             'analysis_methods': ['deepfashion_clip', 'deepfashion_fallback'],
             'model_name': 'openai/clip-vit-base-patch32'
         }
