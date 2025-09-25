@@ -1148,24 +1148,6 @@ const handleSaveFavorite = async () => {
               <Text style={styles.buttonText}>Favorite</Text>
             </TouchableOpacity>
           </View>
-          
-          <View style={styles.buttonRow}>
-            <TouchableOpacity 
-              style={styles.likeButton} 
-              onPress={handleLikeOutfit}
-            >
-              <Ionicons name="heart" size={20} color="#fff" />
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.wearButton} 
-              onPress={handleWearOutfit}
-            >
-              <Ionicons name="checkmark" size={20} color="#fff" />
-              <Text style={styles.buttonText}>Wear This</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       )}
     </SafeAreaView>

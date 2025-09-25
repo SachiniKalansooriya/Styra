@@ -10,7 +10,6 @@ import GetOutfitScreen from './src/screens/GetOutfitScreen';
 import AddClothesScreen from './src/screens/AddClothesScreen';
 import FavoriteOutfitsScreen from './src/screens/FavoriteOutfitsScreen';
 import WornOutfitsScreen from './src/screens/WornOutfitsScreen';
-import BuyRecommendationsScreen from './src/screens/BuyRecommendationsScreen';
 import connectionService from './src/services/connectionService';
 import authService from './src/services/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,7 +31,7 @@ export default function App() {
     console.log('========================');
     
     // Check if trying to navigate to protected screens without authentication
-    const protectedScreens = ['Home', 'MyWardrobe', 'GetOutfit', 'TripPlanner', 'FavoriteOutfits', 'WornOutfits', 'AddClothes', 'BuyRecommendations', 'SavedTrips', 'PackingListResults'];
+  const protectedScreens = ['Home', 'MyWardrobe', 'GetOutfit', 'TripPlanner', 'FavoriteOutfits', 'WornOutfits', 'AddClothes', 'SavedTrips', 'PackingListResults'];
     
     if (protectedScreens.includes(screenName) && !isAuthenticated) {
       console.log('Access denied - redirecting to Landing');
@@ -178,8 +177,7 @@ const initializeApp = async () => {
         return <FavoriteOutfitsScreen {...navigationProps} />;
       case 'WornOutfits':
         return <WornOutfitsScreen {...navigationProps} />;
-      case 'BuyRecommendations':
-        return <BuyRecommendationsScreen {...navigationProps} />;
+      
       default:
         return <LandingScreen {...navigationProps} />;
     }
