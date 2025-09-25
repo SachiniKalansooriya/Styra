@@ -195,7 +195,7 @@ const GetOutfitScreen = ({ navigation }) => {
     }
   };
 
-  const generateOutfit = async () => {
+  const generateOutfit = async (variation = false) => {
     setLoading(true);
     
     try {
@@ -231,7 +231,7 @@ const GetOutfitScreen = ({ navigation }) => {
           icon: getWeatherIcon(demoCondition)
         });
         
-      } else {
+  } else {
         const locationData = location || {
           latitude: 37.7749,
           longitude: -122.4194,
@@ -251,6 +251,8 @@ const GetOutfitScreen = ({ navigation }) => {
       
   // Add a nonce to avoid cached responses and force new generation
   requestData.nonce = Date.now();
+  // Pass variation flag when Try Again requested to get a different but matching outfit
+  if (variation) requestData.variation = true;
   const data = await apiService.post('/api/outfit/ai-recommendation', requestData);
       
       console.log('API Response:', data);
@@ -559,7 +561,8 @@ const GetOutfitScreen = ({ navigation }) => {
   };
 
   const handleDislikeOutfit = () => {
-    generateOutfit();
+    // Request a varied outfit when user hits Try Again
+    generateOutfit(true);
   };
 
   const handleWearOutfit = async () => {

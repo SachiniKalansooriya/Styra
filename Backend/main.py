@@ -992,11 +992,15 @@ async def get_ai_outfit_recommendation(request_data: dict, current_user: dict = 
                 'location': 'Default Location'
             }
         
+        # Determine if a variation / alternative-generation is requested
+        variation = bool(request_data.get('variation') or request_data.get('nonce'))
+
         # Generate AI recommendation using user's actual wardrobe
         outfit_recommendation = enhanced_outfit_service.generate_outfit_recommendation(
             user_id=user_id,
             weather_data=weather_data,
-            occasion=occasion
+            occasion=occasion,
+            variation=variation
         )
         
         return {

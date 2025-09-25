@@ -11,6 +11,7 @@ import requests
 import json
 import uuid
 from datetime import datetime
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +245,7 @@ class AIEnhancedOutfitService:
         
         return compatibility_map.get(category.lower(), ['sunny', 'cloudy'])
     
-    def generate_outfit_recommendation(self, user_id: int, weather_data: Dict, occasion: str) -> Dict:
+    def generate_outfit_recommendation(self, user_id: int, weather_data: Dict, occasion: str, variation: bool = False) -> Dict:
         """Generate AI-enhanced outfit recommendation using user's actual wardrobe"""
         try:
             wardrobe_items = self.get_user_wardrobe_items(user_id)
@@ -283,12 +284,18 @@ class AIEnhancedOutfitService:
             for req_cat in required_categories:
                 possible_cats = [req_cat, req_cat[:-1], 'dresses' if req_cat == 'tops' else req_cat]
                 found_item = None
-                
+
                 for cat_variant in possible_cats:
                     if cat_variant in scored_items and scored_items[cat_variant]:
-                        found_item = scored_items[cat_variant][0]
+                        # Choose top candidate or random among top-N when variation requested
+                        if variation:
+                            top_n = min(3, len(scored_items[cat_variant]))
+                            idx = random.randrange(top_n)
+                            found_item = scored_items[cat_variant][idx]
+                        else:
+                            found_item = scored_items[cat_variant][0]
                         break
-                
+
                 if found_item:
                     outfit_items.append(found_item[0])
                     total_score += found_item[1]
@@ -299,14 +306,22 @@ class AIEnhancedOutfitService:
             for opt_cat in optional_categories:
                 if opt_cat in scored_items and scored_items[opt_cat]:
                     if opt_cat == 'shoes':
-                        outfit_items.append(scored_items[opt_cat][0][0])
-                        total_score += scored_items[opt_cat][0][1]
+                        chosen = scored_items[opt_cat][0]
+                        if variation:
+                            top_n = min(3, len(scored_items[opt_cat]))
+                            chosen = scored_items[opt_cat][random.randrange(top_n)]
+                        outfit_items.append(chosen[0])
+                        total_score += chosen[1]
                         score_count += 1
                     elif opt_cat == 'outerwear':
                         temp = weather_data.get('temperature', 20)
                         if temp < 15 or 'rain' in weather_data.get('condition', '').lower():
-                            outfit_items.append(scored_items[opt_cat][0][0])
-                            total_score += scored_items[opt_cat][0][1]
+                            chosen = scored_items[opt_cat][0]
+                            if variation:
+                                top_n = min(3, len(scored_items[opt_cat]))
+                                chosen = scored_items[opt_cat][random.randrange(top_n)]
+                            outfit_items.append(chosen[0])
+                            total_score += chosen[1]
                             score_count += 1
             
             # Calculate confidence
