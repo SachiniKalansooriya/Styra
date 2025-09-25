@@ -73,7 +73,9 @@ class AIEnhancedOutfitService:
                 'formal': (8, 10),
                 'workout': (1, 3),
                 'date': (6, 9),
-                'datenight': (6, 9)
+                'datenight': (6, 9),
+                # Party outfits should be dressy but allow statement/shiny pieces
+                'party': (6, 9)
             },
             'occasion_specific_rules': {
                 'casual': {
@@ -93,6 +95,12 @@ class AIEnhancedOutfitService:
                     'preferred_items': ['dress', 'frock', 'nice top', 'blouse', 'crop top', 'denim', 'jeans', 'cute pants', 'heels', 'flats', 'boots'],
                     'color_preferences': ['red', 'black', 'blue', 'white', 'pink', 'burgundy', 'navy'],
                     'avoid_items': ['workout', 'athletic', 'gym clothes', 'office trousers', 'formal pants', 'dress pants', 'blazer', 'business shirt']
+                },
+                'party': {
+                    'preferred_categories': ['dresses', 'tops', 'bottoms', 'shoes', 'accessories'],
+                    'preferred_items': ['sequined dress', 'sequin top', 'metallic top', 'leather jacket', 'statement dress', 'sparkly top', 'sequin skirt', 'glitter top', 'lamé dress', 'shiny blouse', 'bold accessories', 'heels', 'boots'],
+                    'color_preferences': ['gold', 'silver', 'black', 'red', 'burgundy', 'navy', 'metallic'],
+                    'avoid_items': ['plain activewear', 'workout clothes', 'very casual lounge wear']
                 },
                 'formal': {
                     'preferred_categories': ['tops', 'bottoms', 'shoes', 'accessories'],
@@ -278,9 +286,26 @@ class AIEnhancedOutfitService:
             outfit_items = []
             total_score = 0
             score_count = 0
+
+            # For party occasions, prefer a dress (single-piece) if available
+            dress_added = False
+            if occasion == 'party':
+                for dress_key in ['dress', 'dresses', 'frock', 'formal dress', 'sequin dress', 'sequined dress']:
+                    if dress_key in scored_items and scored_items[dress_key]:
+                        if variation:
+                            top_n = min(3, len(scored_items[dress_key]))
+                            chosen = scored_items[dress_key][random.randrange(top_n)]
+                        else:
+                            chosen = scored_items[dress_key][0]
+                        outfit_items.append(chosen[0])
+                        total_score += chosen[1]
+                        score_count += 1
+                        dress_added = True
+                        break
             
             # Required categories with common variant names to match frontend inputs
-            required_categories = ['tops', 'bottoms']
+            # If a dress was added for party, skip adding separate top/bottom
+            required_categories = ['tops', 'bottoms'] if not dress_added else []
             for req_cat in required_categories:
                 if req_cat == 'tops':
                     possible_cats = ['tops', 'top', 'shirts', 'shirt', 't-shirts', 't-shirt', 'blouses', 'blouse', 'jersey']
@@ -322,10 +347,20 @@ class AIEnhancedOutfitService:
 
                 if candidates_key and candidates_key in scored_items and scored_items[candidates_key]:
                     if opt_cat == 'shoes':
-                        chosen = scored_items[candidates_key][0]
-                        if variation:
-                            top_n = min(3, len(scored_items[candidates_key]))
-                            chosen = scored_items[candidates_key][random.randrange(top_n)]
+                        # For party, prefer heels if available
+                        chosen = None
+                        if occasion == 'party' and 'heels' in scored_items and scored_items['heels']:
+                            if variation:
+                                top_n = min(3, len(scored_items['heels']))
+                                chosen = scored_items['heels'][random.randrange(top_n)]
+                            else:
+                                chosen = scored_items['heels'][0]
+                        # fallback to the candidates_key list
+                        if not chosen:
+                            chosen = scored_items[candidates_key][0]
+                            if variation:
+                                top_n = min(3, len(scored_items[candidates_key]))
+                                chosen = scored_items[candidates_key][random.randrange(top_n)]
                         outfit_items.append(chosen[0])
                         total_score += chosen[1]
                         score_count += 1
@@ -415,7 +450,19 @@ class AIEnhancedOutfitService:
         
         # Color and comfort (15% weight)
         score += 15.0
-        
+
+        # Party occasion: boost shiny/metallic/sequin items to favor party looks
+        try:
+            if occasion == 'party':
+                name_lower = item.get('name', '').lower()
+                color_lower = str(item.get('color', '')).lower()
+                shiny_keywords = ['sequin', 'sequined', 'metallic', 'glitter', 'sparkle', 'sparkly', 'lamé', 'lame', 'shiny']
+                if any(k in name_lower for k in shiny_keywords) or any(k in color_lower for k in ['gold', 'silver', 'metallic']):
+                    score += 10.0
+        except Exception:
+            # In case item fields are missing or unexpected, ignore party bonus
+            pass
+
         return min(score, 100.0)
     
     def _extract_weather_conditions(self, weather_data: Dict) -> List[str]:
@@ -483,7 +530,7 @@ class AIEnhancedOutfitService:
     
     def generate_multi_occasion_recommendations(self, user_id: int, weather_data: Dict) -> Dict:
         """Generate outfit recommendations for all occasions"""
-        occasions = ['casual', 'work', 'formal', 'workout', 'datenight']
+        occasions = ['casual', 'work', 'formal', 'workout', 'datenight', 'party']
         recommendations = {}
         
         try:
@@ -545,7 +592,8 @@ class AIEnhancedOutfitService:
             'business': 'professional appearance',
             'formal': 'sophisticated events',
             'workout': 'active lifestyle',
-            'datenight': 'special occasions'
+            'datenight': 'special occasions',
+            'party': 'celebratory nights out with statement and shiny pieces'
         }.get(occasion, 'your planned activities')
         
         return f"Perfect for {occasion_text} with {temp_desc}. Your {', '.join(item_names[:2])} combination creates a well-coordinated look from your wardrobe."

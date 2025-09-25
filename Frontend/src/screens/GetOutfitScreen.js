@@ -45,6 +45,7 @@ const GetOutfitScreen = ({ navigation }) => {
     { id: 'formal', name: 'Formal', icon: 'business' },
     { id: 'workout', name: 'Workout', icon: 'fitness' },
     { id: 'date', name: 'Date Night', icon: 'heart' },
+    { id: 'party', name: 'Party', icon: 'sparkles' },
   ];
 
   // Loading weather data
@@ -319,7 +320,7 @@ const GetOutfitScreen = ({ navigation }) => {
             precipitation: 0,
             location: 'Demo Location'
           },
-          occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
+          occasions: ['casual', 'work', 'formal', 'workout', 'datenight', 'party']
         };
       } else {
         requestData = {
@@ -331,7 +332,7 @@ const GetOutfitScreen = ({ navigation }) => {
             latitude: 40.7128,
             longitude: -74.0060
           },
-          occasions: ['casual', 'work', 'formal', 'workout', 'datenight']
+          occasions: ['casual', 'work', 'formal', 'workout', 'datenight', 'party']
         };
       }
       
@@ -952,7 +953,8 @@ const handleSaveFavorite = async () => {
         work: '#2196F3', 
         formal: '#9C27B0',
         workout: '#FF5722',
-        datenight: '#E91E63'
+        datenight: '#E91E63',
+        party: '#FFD700' // gold for shiny/party looks
       };
       return colors[occasionId] || '#666';
     };
