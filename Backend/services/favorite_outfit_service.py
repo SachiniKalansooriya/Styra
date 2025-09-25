@@ -11,6 +11,50 @@ class FavoriteOutfitService:
     def __init__(self):
         # Table already exists from your schema, no need to create it
         pass
+
+    def _normalize_occasion(self, raw_occasion) -> str:
+        """Normalize incoming occasion values to DB enum values."""
+        try:
+            occ_candidate = str(raw_occasion).lower() if raw_occasion is not None else 'casual'
+        except Exception:
+            occ_candidate = 'casual'
+
+        allowed_occasions = {
+            'casual', 'formal', 'business', 'athletic',
+            'beachwear', 'party', 'datenight', 'seasonal'
+        }
+
+        occasion_map = {
+            'work': 'business',
+            'workplace': 'business',
+            'workout': 'athletic',
+            'gym': 'athletic',
+            'sports': 'athletic',
+            'beach': 'beachwear',
+            'date': 'datenight',
+            'date-night': 'datenight',
+            'nightout': 'party',
+            'party-night': 'party'
+        }
+
+        if occ_candidate in allowed_occasions:
+            return occ_candidate
+        if occ_candidate in occasion_map:
+            return occasion_map[occ_candidate]
+
+        # Fuzzy fallback
+        if 'work' in occ_candidate:
+            return 'business'
+        if 'date' in occ_candidate:
+            return 'datenight'
+        if 'beach' in occ_candidate:
+            return 'beachwear'
+        if 'sport' in occ_candidate or 'gym' in occ_candidate:
+            return 'athletic'
+        if 'party' in occ_candidate or 'night' in occ_candidate:
+            return 'party'
+
+        return 'casual'
     
     def save_favorite_outfit(self, user_id: int, outfit_data: Dict, outfit_name: str = None) -> Dict:
         """Save an outfit as favorite with name"""
@@ -22,7 +66,8 @@ class FavoriteOutfitService:
             outfit_items = outfit_data.get('items', []) or []
             outfit_json = json.dumps(outfit_items)
             weather_json = json.dumps(outfit_data.get('weather_context', {}))
-            occasion = outfit_data.get('occasion', 'casual')
+            # Normalize occasion to DB enum value
+            occasion = self._normalize_occasion(outfit_data.get('occasion', 'casual'))
             confidence = float(outfit_data.get('confidence', 0))
             # Try to extract a representative image from the first item
             image_url = None
@@ -280,8 +325,10 @@ class FavoriteOutfitService:
                 values.append(updates['notes'])
             
             if 'occasion' in updates:
+                # Normalize occasion before saving to DB
+                normalized = self._normalize_occasion(updates['occasion'])
                 update_fields.append('occasion = %s')
-                values.append(updates['occasion'])
+                values.append(normalized)
             
             if not update_fields:
                 return {

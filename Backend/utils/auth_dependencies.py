@@ -2,6 +2,9 @@ from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 from .jwt_utils import verify_token
+import logging
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer(auto_error=False)
 
@@ -14,10 +17,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     )
     
     if not credentials:
+        logger.warning('No credentials provided in request')
         raise credentials_exception
     
     user_data = verify_token(credentials.credentials)
     if user_data is None:
+        logger.warning(f'JWT verification returned None for token prefix: {str(credentials.credentials)[:20]}')
         raise credentials_exception
     
     return user_data

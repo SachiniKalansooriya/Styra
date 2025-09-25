@@ -1,5 +1,6 @@
 // src/services/apiService.js
 import API_CONFIG from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class ApiService {
   constructor() {
@@ -20,6 +21,19 @@ class ApiService {
       }
     } catch (e) {
       console.log('Could not get auth token:', e);
+    }
+
+    // Fallback: if auth header not set, try AsyncStorage (covers app reloads where
+    // in-memory authService.token wasn't initialized yet)
+    if (!authHeaders.Authorization && !endpoint.includes('/auth/')) {
+      try {
+        const stored = await AsyncStorage.getItem('access_token');
+        if (stored) {
+          authHeaders.Authorization = `Bearer ${stored}`;
+        }
+      } catch (e) {
+        console.log('Could not read token from AsyncStorage:', e);
+      }
     }
     
     const config = {

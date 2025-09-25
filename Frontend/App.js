@@ -7,9 +7,6 @@ import { SignUpScreen } from './src/screens/SignUpScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import MyWardrobeScreen from './src/screens/MyWardrobeScreen';
 import GetOutfitScreen from './src/screens/GetOutfitScreen';
-import TripPlannerScreen from './src/screens/TripPlannerScreen';
-import PackingListResultsScreen from './src/screens/PackingListResultsScreen';
-import SavedTripsScreen from './src/screens/SavedTripsScreen';
 import AddClothesScreen from './src/screens/AddClothesScreen';
 import FavoriteOutfitsScreen from './src/screens/FavoriteOutfitsScreen';
 import WornOutfitsScreen from './src/screens/WornOutfitsScreen';
@@ -177,12 +174,6 @@ const initializeApp = async () => {
         return <MyWardrobeScreen {...navigationProps} />;
       case 'GetOutfit':
         return <GetOutfitScreen {...navigationProps} />;
-      case 'TripPlanner':
-        return <TripPlannerScreen {...navigationProps} />;
-      case 'PackingListResults':
-        return <PackingListResultsScreen {...navigationProps} />;
-      case 'SavedTrips':
-        return <SavedTripsScreen {...navigationProps} />;
       case 'FavoriteOutfits':
         return <FavoriteOutfitsScreen {...navigationProps} />;
       case 'WornOutfits':

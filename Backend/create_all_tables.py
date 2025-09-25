@@ -36,7 +36,6 @@ def create_all_tables():
                 "DROP TABLE IF EXISTS weather_cache CASCADE;",
                 "DROP TABLE IF EXISTS buying_recommendations CASCADE;",
                 "DROP TABLE IF EXISTS analysis_history CASCADE;",
-                "DROP TABLE IF EXISTS trips CASCADE;",
                 "DROP TABLE IF EXISTS outfit_items CASCADE;",
                 "DROP TABLE IF EXISTS favorite_outfits CASCADE;",
                 "DROP TABLE IF EXISTS outfit_history CASCADE;",
@@ -189,28 +188,7 @@ def create_all_tables():
                 CREATE INDEX idx_outfit_items_wardrobe_item ON outfit_items(wardrobe_item_id);
             """)
             
-            # 6. Trips table (depends on users)
-            print("Creating trips table...")
-            cursor.execute("""
-                CREATE TABLE trips (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    destination VARCHAR(255) NOT NULL,
-                    start_date TIMESTAMP NOT NULL,
-                    end_date TIMESTAMP NOT NULL,
-                    activities JSONB,
-                    weather_expected VARCHAR(100),
-                    packing_style packingstyle DEFAULT 'minimal',
-                    packing_list JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
-                    CHECK (end_date > start_date)
-                );
-                
-                CREATE INDEX idx_trips_user_id ON trips(user_id);
-                CREATE INDEX idx_trips_start_date ON trips(start_date);
-            """)
+            # trips table has been removed from schema
             
             # 7. Analysis History table (depends on users)
             print("Creating analysis_history table...")
@@ -376,7 +354,6 @@ def create_all_tables():
         print("- outfit_history")
         print("- favorite_outfits")
         print("- outfit_items")
-        print("- trips")
         print("- analysis_history")
         print("- buying_recommendations")
         print("- weather_cache")

@@ -518,14 +518,6 @@ const HomeScreen = ({ navigation, onLogout }) => {
       onPress: () => navigation.navigate('MyWardrobe')
     },
     {
-      id: 'saved-trips',
-      title: 'Saved Trips',
-      subtitle: 'Your trip history',
-      icon: 'airplane',
-      color: '#8A724C',
-      onPress: () => navigation.navigate('SavedTrips')
-    },
-    {
       id: 'favorites',
       title: 'Favorites',
       subtitle: 'Saved outfits',
@@ -536,17 +528,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
         navigation.navigate('FavoriteOutfits');
       }
     },
-    {
-      id: 'worn-outfits',
-      title: 'Worn Outfits',
-      subtitle: 'Outfit history',
-      icon: 'checkmark-circle',
-      color: '#B99668',
-      onPress: () => {
-        console.log('Navigating to WornOutfits screen');
-        navigation.navigate('WornOutfits');
-      }
-    }
+    
   ];
 
   const renderQuickAction = (action) => (
@@ -680,101 +662,8 @@ const HomeScreen = ({ navigation, onLogout }) => {
                 </Text>
               </View>
 
-              <View style={styles.insightCard}>
-                <View style={styles.insightHeader}>
-                  <Ionicons name="trending-up" size={20} color="#3498DB" />
-                  <Text style={styles.insightTitleSmall}>Most Worn</Text>
-                </View>
-                <Text style={styles.insightValueSmall}>{wardrobeStats.mostWornCategory}</Text>
-              </View>
-
-              <View style={styles.insightCard}>
-                <View style={styles.insightHeader}>
-                  <Ionicons name="time" size={20} color="#9B59B6" />
-                  <Text style={styles.insightTitleSmall}>Last Added</Text>
-                </View>
-                <Text style={styles.insightValueSmall}>
-                  {wardrobeStats.recentlyAdded > 0 ? 'This week' : 'None recent'}
-                </Text>
-              </View>
+              {/* Removed Most Worn and Last Added cards per request */}
             </View>
-          </View>
-
-          {/* Featured Cards */}
-          <View style={styles.featuredContainer}>
-            <Text style={styles.sectionTitle}>Discover</Text>
-            
-            {/* Trip Planner Feature Card */}
-            <TouchableOpacity 
-              style={styles.featureCard}
-              onPress={() => navigation.navigate('TripPlanner')}
-            >
-              <View style={[styles.featureGradient, { backgroundColor: '#F7F3E8' }]}>
-                <View style={styles.featureContent}>
-                  <View style={styles.featureLeft}>
-                    <Text style={styles.featureTitle}>Plan Your Trip</Text>
-                    <Text style={styles.featureSubtitle}>
-                      Smart packing lists based on your wardrobe
-                    </Text>
-                    <View style={styles.featureButton}>
-                      <Text style={styles.featureButtonText}>Start Planning</Text>
-                      <Ionicons name="arrow-forward" size={16} color="#8A724C" />
-                    </View>
-                  </View>
-                  <View style={styles.featureRight}>
-                    <Ionicons name="airplane" size={50} color="#000" />
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* AI Styling Feature Card */}
-            <TouchableOpacity 
-              style={styles.featureCard}
-              onPress={() => navigation.navigate('BuyRecommendations')}
-            >
-              <View style={[styles.featureGradient, { backgroundColor: '#F7F3E8' }]}>
-                <View style={styles.featureContent}>
-                  <View style={styles.featureLeft}>
-                    <Text style={styles.featureTitle}>AI Shopping Assistant</Text>
-                    <Text style={styles.featureSubtitle}>
-                      Get personalized buying recommendations
-                    </Text>
-                    <View style={styles.featureButton}>
-                      <Text style={styles.featureButtonText}>Shop Smart</Text>
-                      <Ionicons name="bag-add" size={16} color="#8A724C" />
-                    </View>
-                  </View>
-                  <View style={styles.featureRight}>
-                    <Ionicons name="bag-add" size={50} color="#B99668" />
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* Worn Outfits Feature Card */}
-            <TouchableOpacity 
-              style={styles.featureCard}
-              onPress={() => navigation.navigate('WornOutfits')}
-            >
-              <View style={[styles.featureGradient, { backgroundColor: '#F7F3E8' }]}>
-                <View style={styles.featureContent}>
-                  <View style={styles.featureLeft}>
-                    <Text style={styles.featureTitle}>Worn Outfits</Text>
-                    <Text style={styles.featureSubtitle}>
-                      View your outfit history with dates
-                    </Text>
-                    <View style={styles.featureButton}>
-                      <Text style={styles.featureButtonText}>View History</Text>
-                      <Ionicons name="checkmark-circle" size={16} color="#8A724C" />
-                    </View>
-                  </View>
-                  <View style={styles.featureRight}>
-                    <Ionicons name="calendar" size={50} color="#000" />
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
           </View>
           <View style={styles.bottomSpacing} />
         </ScrollView>

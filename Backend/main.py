@@ -12,13 +12,10 @@ from image_analysis import image_analysis_service
 from services.analysis_history_service import analysis_history_service
 from services.wardrobe_service import wardrobe_service
 from services.image_storage_service import image_storage_service
-from services.trip_ai_service import TripAIService
 from services.outfit_history_service import OutfitHistoryService
-from services.trip_ai_generator import trip_ai_generator
 from services.ai_enhanced_outfit_service import ai_enhanced_outfit_service as enhanced_outfit_service
 from services.favorite_outfit_service import favorite_outfit_service
 from services.weather_service import weather_service
-from services.trip_service import trip_service
 from services.buy_recommendation_service import BuyRecommendationService
 from database.connection import DatabaseConnection
 from sqlalchemy.orm import Session
@@ -50,14 +47,13 @@ from utils.jwt_utils import verify_password, get_password_hash, create_access_to
 from utils.auth_dependencies import get_current_user, get_current_user_optional
 
 # Initialize services
-trip_ai_service = None
 outfit_history_service = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize services on startup and cleanup on shutdown"""
     # Startup
-    global trip_ai_service, outfit_history_service
+    global outfit_history_service
     
     try:
         # Create users table if it doesn't exist
@@ -80,15 +76,7 @@ async def lifespan(app: FastAPI):
         service_status = image_analysis_service.get_service_info()
         logger.info(f"Image analysis service initialized: {service_status}")
         
-        # Initialize trip AI generator
-        if trip_ai_generator.load_ai_models():
-            logger.info("Trip AI generator initialized successfully")
-        else:
-            logger.warning("Trip AI generator failed to initialize - using fallback mode")
         
-        # Initialize trip AI service
-        trip_ai_service = TripAIService()
-        logger.info("Trip AI service initialized")
         
         # Test database connection and initialize outfit history service
         DATABASE_URL = os.getenv("DATABASE_URL")
@@ -116,7 +104,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Styra AI Wardrobe Backend",
-    description="Backend API with JWT Authentication, AI Clothing Analysis, Trip Planning, and Smart Outfit Recommendations",
+    description="Backend API with JWT Authentication, AI Clothing Analysis, and Smart Outfit Recommendations",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -156,10 +144,9 @@ async def root():
                 "Smart Outfit Recommendations",
                 "Weather-Based Styling",
                 "Personal Wardrobe Integration",
-                "Smart Trip Planning",
                 "Wardrobe Integration",
-                "AI-Powered Packing Lists",
                 "Machine Learning Preferences"
+                
             ]
         }
     except Exception as e:
@@ -1276,101 +1263,6 @@ async def record_worn_outfit(request_data: dict, current_user: dict = Depends(ge
         logger.exception("Record worn outfit error")
         raise HTTPException(status_code=500, detail=f"Failed to record outfit wear: {str(e)}")
     
-# Trip Planning Routes (Protected)
-@app.post("/api/trip-planner/enhanced-packing")
-async def enhanced_packing_recommendations(request_data: dict, current_user: dict = Depends(get_current_user)):
-    """Generate enhanced packing recommendations with wardrobe integration (protected)"""
-    try:
-        user_id = current_user["user_id"]
-        logger.info(f"Processing enhanced packing request for user {user_id}...")
-        
-        trip_details = request_data.get('tripDetails', {})
-        wardrobe_items = request_data.get('wardrobeItems', [])
-        duration = request_data.get('duration', 7)
-        
-        logger.info(f"Trip destination: {trip_details.get('destination', 'Unknown')}")
-        logger.info(f"Activities: {trip_details.get('activities', [])}")
-        logger.info(f"Weather: {trip_details.get('weatherExpected', 'Unknown')}")
-        logger.info(f"Wardrobe items count: {len(wardrobe_items)}")
-        logger.info(f"Duration: {duration}")
-        
-        # Use the AI trip generator for intelligent analysis
-        if trip_ai_generator.ai_loaded:
-            logger.info("Using AI-powered trip planning")
-            recommendations = trip_ai_generator.generate_intelligent_packing_list(trip_details, wardrobe_items, duration)
-            
-            # Also get traditional analysis for comparison
-            wardrobe_analysis = trip_ai_service.analyze_wardrobe_for_trip(wardrobe_items, trip_details)
-            wardrobe_matches = trip_ai_service.find_detailed_wardrobe_matches(recommendations, wardrobe_items)
-            coverage = trip_ai_service.calculate_detailed_wardrobe_coverage(wardrobe_items, recommendations)
-            
-        else:
-            logger.info("Using traditional trip analysis (AI not available)")
-            # Fallback to traditional service
-            wardrobe_analysis = trip_ai_service.analyze_wardrobe_for_trip(wardrobe_items, trip_details)
-            recommendations = trip_ai_service.generate_enhanced_trip_recommendations(trip_details, wardrobe_analysis, duration)
-            wardrobe_matches = trip_ai_service.find_detailed_wardrobe_matches(recommendations, wardrobe_items)
-            coverage = trip_ai_service.calculate_detailed_wardrobe_coverage(wardrobe_items, recommendations)
-        
-        logger.info("Enhanced packing recommendations generated successfully")
-        
-        return {
-            "status": "success",
-            "recommendations": recommendations,
-            "wardrobeMatches": wardrobe_matches,
-            "analysis": wardrobe_analysis,
-            "coverage": coverage,
-            "message": "Smart packing list generated with AI analysis",
-            "user_id": user_id
-        }
-        
-    except Exception as e:
-        logger.error(f"Enhanced packing recommendations error: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate enhanced recommendations: {str(e)}")
-
-@app.get("/api/trips")
-async def get_user_trips(current_user: dict = Depends(get_current_user)):
-    """Get user's saved trips (protected)"""
-    try:
-        user_id = current_user["user_id"]
-        logger.info(f"Getting trips for user: {user_id}")
-        
-        # Use the trip service to get from database
-        trips = trip_service.get_user_trips(user_id)
-        
-        return {
-            "status": "success",
-            "trips": trips,
-            "count": len(trips),
-            "user_id": user_id
-        }
-    except Exception as e:
-        logger.error(f"Get trips error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve trips: {str(e)}")
-
-@app.post("/api/trips")
-async def save_trip(trip_data: dict, current_user: dict = Depends(get_current_user)):
-    """Save trip details and packing list (protected)"""
-    try:
-        user_id = current_user["user_id"]
-        trip_data['user_id'] = user_id  # Ensure trip belongs to authenticated user
-        logger.info(f"Saving trip for user {user_id}: {trip_data.get('destination', 'Unknown')}")
-        
-        # Use the trip service to save to database
-        result = trip_service.save_trip(trip_data)
-        
-        return {
-            "status": "success",
-            "trip_id": result["id"],
-            "message": "Trip saved successfully to database",
-            "user_id": user_id
-        }
-    except Exception as e:
-        logger.error(f"Save trip error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save trip: {str(e)}")
-
 # Weather Integration
 @app.get("/api/weather/{lat}/{lon}")
 async def get_weather_data(lat: float, lon: float):
@@ -1403,7 +1295,7 @@ async def get_system_info():
                 "smart_outfit_recommendations": True,
                 "weather_integration": True,
                 "wardrobe_management": True,
-                "trip_planning": True,
+                
                 "color_analysis": True,
                 "style_learning": True
             },
