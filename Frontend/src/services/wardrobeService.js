@@ -10,19 +10,16 @@ class WardrobeService {
       
       if (isOnline) {
         try {
-          // Your apiService already handles auth tokens automatically
-          // Just pass the filters as query parameters
           const response = await apiService.get('/api/wardrobe/items', filters);
           
           console.log('Backend response:', response);
           
-          // Extract the items array from the backend response
           return response.items || [];
           
         } catch (error) {
           console.log('Backend fetch failed, using local storage:', error.message);
           
-          // If it's an auth error, throw it to let the UI handle it
+       
           if (error.message.includes('Authentication expired')) {
             throw error;
           }
@@ -34,8 +31,6 @@ class WardrobeService {
       }
     } catch (error) {
       console.error('Error fetching wardrobe items:', error);
-      
-      // Re-throw auth errors so the UI can handle them
       if (error.message.includes('Authentication expired')) {
         throw error;
       }

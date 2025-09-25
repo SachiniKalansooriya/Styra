@@ -266,20 +266,20 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
   };
 
   const categories = [
-    { key: 'tops', label: 'Tops', emoji: '👕' },
-    { key: 'bottoms', label: 'Bottoms', emoji: '👖' },
-    { key: 'dresses', label: 'Dresses', emoji: '👗' },
-    { key: 'jersey', label: 'Jersey', emoji: '🏀' },
-    { key: 'shoes', label: 'Shoes', emoji: '👟' },
-    { key: 'heels', label: 'Heels', emoji: '👠' },
-    { key: 'sandals', label: 'Sandals', emoji: '🩴' },
-    { key: 'slippers', label: 'Slippers', emoji: '🥿' },
-    { key: 'accessories', label: 'Accessories', emoji: '👜' },
-    { key: 'outerwear', label: 'Outerwear', emoji: '🧥' },
-    { key: 'sportswear', label: 'Sportswear', emoji: '🏃' },
-    { key: 'formal', label: 'Formal', emoji: '🤵' },
-    { key: 'sleepwear', label: 'Sleepwear', emoji: '🛌' },
-    { key: 'underwear', label: 'Underwear', emoji: '🩲' },
+    { key: 'tops', label: 'Tops' },
+    { key: 'bottoms', label: 'Bottoms' },
+    { key: 'dresses', label: 'Dresses'},
+    { key: 'jersey', label: 'Jersey', },
+    { key: 'shoes', label: 'Shoes'},
+    { key: 'heels', label: 'Heels'},
+    { key: 'sandals', label: 'Sandals' },
+    { key: 'slippers', label: 'Slippers' },
+    { key: 'accessories', label: 'Accessories'},
+    { key: 'outerwear', label: 'Outerwear'},
+    { key: 'sportswear', label: 'Sportswear'},
+    { key: 'formal', label: 'Formal'},
+    { key: 'sleepwear', label: 'Sleepwear'},
+    { key: 'underwear', label: 'Underwear'},
   ];
 
   const colors = [
@@ -380,7 +380,7 @@ const AddClothesScreen = ({ navigation, backendConnected }) => {
               style={styles.tipButton}
               onPress={() => Alert.alert('Tips', 'For best results:\n• Good lighting\n• Plain background\n• Item laid flat\n• Fill the frame')}
             >
-              <Text style={styles.controlText}>💡</Text>
+              <Icon name="lightbulb-outline" size={24} color="white" />
     
             </TouchableOpacity>
           </View>

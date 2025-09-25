@@ -1,4 +1,3 @@
-// services/outfitHistoryService.js
 import apiService from './apiService';
 
 class OutfitHistoryService {
@@ -6,7 +5,6 @@ async recordWornOutfit(outfitData, occasion = null, weather = null, location = n
   try {
     const requestData = {
       outfit_data: outfitData,
-      // Remove user_id: 1 - let backend get it from JWT token
       occasion,
       weather,
       location,
@@ -47,8 +45,6 @@ async recordWornOutfit(outfitData, occasion = null, weather = null, location = n
     const response = await apiService.get(`/api/outfit/history?${params.toString()}`);
     console.log('Raw outfit history response:', response);
 
-    // Normalize backend response shapes. Some endpoints return { status: 'success', history: [...] }
-    // others might return just { history: [...] } or similar.
     if (response && (response.status === 'success' || response.history)) {
       // If status present and success, return as-is; otherwise wrap history into expected shape
       if (response.status === 'success') {

@@ -62,9 +62,9 @@ class WeatherService {
       }
     }
 
-    // If all APIs fail, generate contextual mock data
-    console.log('All weather APIs failed, generating contextual data');
-    return this.generateContextualWeatherData(latitude, longitude);
+  // If all APIs fail, throw error
+  console.log('All weather APIs failed');
+  throw new Error('Unable to retrieve weather data from any source');
   }
 
   // Enhanced location accuracy
@@ -383,52 +383,6 @@ class WeatherService {
     return null;
   }
 
-  // Generate contextual weather when APIs fail
-  async generateContextualWeatherData(latitude, longitude) {
-    console.log('Generating contextual weather data');
-    
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const hour = now.getHours();
-    
-    // Climate zone based on latitude
-    const climateZone = this.getClimateZone(latitude);
-    const seasonalFactor = this.getSeasonalFactor(latitude, month);
-    
-    // Calculate temperature
-    const baseTemp = this.calculateBaseTemperature(climateZone, seasonalFactor, hour);
-    const tempVariation = (Math.random() - 0.5) * 4;
-    const temperature = Math.round(baseTemp + tempVariation);
-    
-    // Generate conditions
-    const conditions = this.getClimateConditions(climateZone);
-    const condition = conditions[Math.floor(Math.random() * conditions.length)];
-    
-    // Calculate humidity
-    const humidity = this.calculateHumidity(climateZone);
-    
-    // Wind speed
-    const windSpeed = Math.round(Math.random() * 12 + 3);
-    
-    // Get location name
-    const locationName = await this.getLocationName(latitude, longitude);
-
-    return {
-      status: 'success',
-      current: {
-        temperature,
-        condition,
-        humidity,
-        windSpeed,
-        location: {
-          name: locationName || 'Current Location',
-          latitude,
-          longitude
-        }
-      },
-      source: 'Contextual Generation'
-    };
-  }
 
   // Climate zone helper
   getClimateZone(latitude) {

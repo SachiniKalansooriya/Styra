@@ -192,7 +192,6 @@ def create_all_tables():
                 CREATE INDEX idx_outfit_items_wardrobe_item ON outfit_items(wardrobe_item_id);
             """)
             
-            # trips table has been removed from schema
             
             # 7. Analysis History table (depends on users)
             print("Creating analysis_history table...")
@@ -332,7 +331,7 @@ def create_all_tables():
             conn.commit()
         
         conn.close()
-        print("\n✅ Complete database schema created successfully!")
+        print("\nComplete database schema created successfully!")
         print("\nTables created:")
         print("- users")
         print("- wardrobe_items")
@@ -349,7 +348,7 @@ def create_all_tables():
         print("- occasion")
         
     except Exception as e:
-        print(f"❌ Error creating database schema: {e}")
+        print(f"Error creating database schema: {e}")
         import traceback
         traceback.print_exc()
 
@@ -378,12 +377,12 @@ def show_table_info():
             
             tables = cursor.fetchall()
             
-            print("\n📋 Database Tables Information:")
+            print("\n Database Tables Information:")
             print("=" * 50)
             
             for table in tables:
                 table_name = table['table_name']
-                print(f"\n🗃️  Table: {table_name}")
+                print(f"\n  Table: {table_name}")
                 
                 # Get column information
                 cursor.execute("""

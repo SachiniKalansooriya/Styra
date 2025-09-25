@@ -1,4 +1,3 @@
-// src/services/favoriteOutfitService.js
 import apiService from './apiService';
 
 class FavoriteOutfitService {
@@ -11,9 +10,6 @@ class FavoriteOutfitService {
         outfit_data: outfitData,
         name: outfitName
       });
-
-      // Normalize different backend response shapes so callers can rely on
-      // a consistent object: { success: boolean, message: string, id: number|null }
       console.log('favoriteOutfitService.saveFavorite raw response:', response);
 
       if (response === null || response === undefined) {
@@ -89,7 +85,6 @@ class FavoriteOutfitService {
   // Delete a favorite outfit
   async deleteFavorite(userId, favoriteId) {
     try {
-      // Remove userId from URL - backend gets it from JWT token
       const response = await apiService.delete(`/api/favorites/${favoriteId}`);
       return response;
     } catch (error) {

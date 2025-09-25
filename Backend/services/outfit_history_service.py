@@ -212,8 +212,6 @@ class OutfitHistoryService:
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
             
-            # Before inserting, check if an identical outfit has already been recorded
-            # for the same user on the same date. If so, return the existing id.
             try:
                 check_sql = """
                     SELECT id FROM outfit_history

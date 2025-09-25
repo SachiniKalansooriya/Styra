@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class WeatherService:
     def __init__(self):
         self.openweather_api_key = os.getenv('OPENWEATHER_API_KEY')
-        self.weatherapi_key = os.getenv('WEATHERAPI_KEY')  # Optional alternative
+        self.weatherapi_key = os.getenv('WEATHERAPI_KEY')  
         self.cache = {}
         self.cache_duration = 30 * 60  # 30 minutes
     

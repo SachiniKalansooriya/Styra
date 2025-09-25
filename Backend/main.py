@@ -16,7 +16,6 @@ from services.outfit_history_service import OutfitHistoryService
 from services.ai_enhanced_outfit_service import ai_enhanced_outfit_service as enhanced_outfit_service
 from services.favorite_outfit_service import favorite_outfit_service
 from services.weather_service import weather_service
-# buy recommendation service removed
 from database.connection import DatabaseConnection
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext

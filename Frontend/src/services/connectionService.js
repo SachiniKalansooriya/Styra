@@ -1,4 +1,4 @@
-// services/connectionService.js
+
 const BASE_URL = 'http://172.20.10.7:8000';
 
 class ConnectionService {

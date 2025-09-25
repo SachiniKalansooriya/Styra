@@ -23,8 +23,6 @@ class ApiService {
       console.log('Could not get auth token:', e);
     }
 
-    // Fallback: if auth header not set, try AsyncStorage (covers app reloads where
-    // in-memory authService.token wasn't initialized yet)
     if (!authHeaders.Authorization && !endpoint.includes('/auth/')) {
       try {
         const stored = await AsyncStorage.getItem('access_token');
@@ -45,13 +43,6 @@ class ApiService {
       timeout: this.timeout,
       ...options,
     };
-
-    console.log('=== API REQUEST DEBUG ===');
-    console.log('URL:', url);
-    console.log('Method:', config.method || 'GET');
-    console.log('Has Auth:', !!authHeaders.Authorization);
-    console.log('========================');
-
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
