@@ -34,7 +34,7 @@ def create_all_tables():
                 "DROP TABLE IF EXISTS user_preferences CASCADE;",
                 "DROP TABLE IF EXISTS image_processing_cache CASCADE;",
                 "DROP TABLE IF EXISTS weather_cache CASCADE;",
-                "DROP TABLE IF EXISTS buying_recommendations CASCADE;",
+                # buying_recommendations removed
                 "DROP TABLE IF EXISTS analysis_history CASCADE;",
                 "DROP TABLE IF EXISTS outfit_items CASCADE;",
                 "DROP TABLE IF EXISTS favorite_outfits CASCADE;",
@@ -173,6 +173,7 @@ def create_all_tables():
             cursor.execute("""
                 CREATE TABLE outfit_items (
                     id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     outfit_history_id INTEGER REFERENCES outfit_history(id) ON DELETE CASCADE,
                     favorite_outfit_id INTEGER REFERENCES favorite_outfits(id) ON DELETE CASCADE,
                     wardrobe_item_id INTEGER NOT NULL REFERENCES wardrobe_items(id) ON DELETE CASCADE,
@@ -182,7 +183,10 @@ def create_all_tables():
                         (outfit_history_id IS NULL AND favorite_outfit_id IS NOT NULL)
                     )
                 );
+                -- IMPORTANT: Each outfit_items row must include the user_id of the owner.
+                -- This enforces explicit ownership so users cannot see or manipulate others' outfits.
                 
+                CREATE INDEX idx_outfit_items_user_id ON outfit_items(user_id);
                 CREATE INDEX idx_outfit_items_outfit_history ON outfit_items(outfit_history_id);
                 CREATE INDEX idx_outfit_items_favorite_outfit ON outfit_items(favorite_outfit_id);
                 CREATE INDEX idx_outfit_items_wardrobe_item ON outfit_items(wardrobe_item_id);
@@ -208,26 +212,7 @@ def create_all_tables():
                 CREATE INDEX idx_analysis_history_created ON analysis_history(created_at);
             """)
             
-            # 8. Buying Recommendations table (depends on users)
-            print("Creating buying_recommendations table...")
-            cursor.execute("""
-                CREATE TABLE buying_recommendations (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    item_type VARCHAR(100) NOT NULL,
-                    category VARCHAR(100) NOT NULL,
-                    priority VARCHAR(20) NOT NULL CHECK (priority IN ('high', 'medium', 'low')),
-                    reason TEXT NOT NULL,
-                    estimated_price VARCHAR(50),
-                    style_match DECIMAL(5,3),
-                    color_suggestions JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_purchased BOOLEAN DEFAULT false
-                );
-                
-                CREATE INDEX idx_buying_recommendations_user_id ON buying_recommendations(user_id);
-                CREATE INDEX idx_buying_recommendations_priority ON buying_recommendations(priority);
-            """)
+            # buying_recommendations table removed from schema by request
             
             # 9. Weather Cache table (no dependencies)
             print("Creating weather_cache table...")
@@ -294,7 +279,7 @@ def create_all_tables():
             # Add triggers to tables with updated_at columns
             tables_with_updated_at = [
                 'users', 'wardrobe_items', 'favorite_outfits', 
-                'trips', 'user_preferences'
+                'user_preferences'
             ]
             
             for table in tables_with_updated_at:
@@ -355,7 +340,6 @@ def create_all_tables():
         print("- favorite_outfits")
         print("- outfit_items")
         print("- analysis_history")
-        print("- buying_recommendations")
         print("- weather_cache")
         print("- image_processing_cache")
         print("- user_preferences")
