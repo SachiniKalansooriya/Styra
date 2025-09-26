@@ -56,3 +56,6 @@ Backend/static/*
 # Logs
 logs/
 *.log
+
+# Backend environment
+Backend/.env
