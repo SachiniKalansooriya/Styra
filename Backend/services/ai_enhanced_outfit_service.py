@@ -463,6 +463,12 @@ class AIEnhancedOutfitService:
             # In case item fields are missing or unexpected, ignore party bonus
             pass
 
+        # Penalty for recently worn items (within 2 days) to avoid repeats
+        if item.get('last_worn'):
+            days_since_worn = (datetime.now() - item['last_worn']).days
+            if days_since_worn < 2:
+                score -= 20.0  # Reduce score to discourage generating same outfit soon
+
         return min(score, 100.0)
     
     def _extract_weather_conditions(self, weather_data: Dict) -> List[str]:
